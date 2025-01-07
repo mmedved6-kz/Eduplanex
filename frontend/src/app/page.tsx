@@ -1,14 +1,15 @@
-// frontend/src/pages/index.tsx
+"use client"; 
+
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 const Home: React.FC = () => {
-    const [message, setMessage] = useState<string>('');  // Added TypeScript typing
+    const [message, setMessage] = useState<string>('');
 
     useEffect(() => {
         const fetchMessage = async () => {
             try {
-                const response = await axios.get(`http://localhost:5000/`);
+                const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/`);
                 setMessage(response.data);
             } catch (error) {
                 console.error('Error fetching message:', error);
