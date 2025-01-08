@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
@@ -6,12 +6,14 @@ import 'react-calendar/dist/Calendar.css';
 import Image from 'next/image';
 
 type ValuePiece = Date | null;
-
 type Value = ValuePiece | [ValuePiece, ValuePiece];
 
-// TEST
+// Define a consistent date formatting function for both SSR and Client
+const formatDate = (date: Date) => {
+    return date.toISOString().split("T")[0];  // "YYYY-MM-DD"
+};
 
-// Define a simpler type for events (direct date comparison)
+// Test Events Data
 type Event = {
     id: number;
     title: string;
@@ -20,7 +22,7 @@ type Event = {
     date: Date;
 };
 
-const events = [
+const events: Event[] = [
     {
         id: 1,
         title: "Test class 1", 
@@ -37,13 +39,14 @@ const events = [
     }
 ];
 
-
 const ClassCalendar = () => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
-    
+    const [isMounted, setIsMounted] = useState(false);
+
     useEffect(() => {
         setSelectedDate(new Date());
+        setIsMounted(true);
     }, []);
 
     // Handle date change and filter events
@@ -51,30 +54,35 @@ const ClassCalendar = () => {
         if (value instanceof Date) {
             setSelectedDate(value);
             const matchedEvents = events.filter(event =>
-                event.date.toDateString() === value.toDateString()
+                formatDate(event.date) === formatDate(value)
             );
             setFilteredEvents(matchedEvents);
         }
     };
 
-  return (
-    <div className="bg-white p-5 rounded-md">
-        <Calendar
+    // Prevent SSR date mismatch by rendering only after mounting
+    if (!isMounted) {
+        return <div className="text-center text-gray-500">Loading Calendar...</div>;
+    }
+
+    return (
+        <div className="bg-white p-5 rounded-md">
+            <Calendar
                 onChange={handleDateChange}
                 value={selectedDate}
                 tileContent={({ date }) =>
-                    events.some(event => event.date.toDateString() === date.toDateString()) ? (
+                    events.some(event => formatDate(event.date) === formatDate(date)) ? (
                         <div className="flex justify-center items-center">
                             <span className="text-blue-500 font-bold translate-y-1 text-sm">●</span>
                         </div>
                     ) : null
                 }
             />
-        <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold my-4">Events</h1>
-            <Image src="/logo.png" alt="" width={20} height={20} />
-        </div>
-        <div className="flex flex-col gap-4 mt-4">
+            <div className="flex items-center justify-between">
+                <h1 className="text-xl font-semibold my-4">Events</h1>
+                <Image src="/exam.png" alt="Events Icon" width={20} height={20} />
+            </div>
+            <div className="flex flex-col gap-4 mt-4">
                 {filteredEvents.length > 0 ? (
                     filteredEvents.map((event) => (
                         <div
@@ -90,8 +98,8 @@ const ClassCalendar = () => {
                     <p className="text-sm text-gray-400">No events for this date.</p>
                 )}
             </div>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default ClassCalendar;

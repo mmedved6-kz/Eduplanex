@@ -6,7 +6,7 @@ const ClassCard = ({ title, description }: { title: string; description: string 
         <div className="flex items-center bg-white border border-gray-300 shadow-lg p-6 rounded-lg hover:shadow-xl transition duration-300">
             {/* Icon Section */}
             <div className="flex-shrink-0 bg-gray-300 p-4 rounded-md mr-4">
-                <Image src="/logo.png" alt="Class Icon" width={32} height={32}/>
+                <Image src="/class.png" alt="Class Icon" width={32} height={32}/>
             </div>
 
             {/* Text Content Section */}
