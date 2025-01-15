@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { JSX, useState } from "react";
+import TeacherForm from "./forms/TeacherForm";
+
+const forms:{
+  [key:string]:(type:"create" | "update", data?:any) => JSX.Element;
+} = {
+  staff: (type, data) => <TeacherForm type={type} data={data} />,
+};
 
 const FormModal = ({
   table,
@@ -9,7 +16,7 @@ const FormModal = ({
   data,
   id,
 }: {
-  table: "staff" | "student" | "module" | "course" | "class";
+  table: "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event";
   type: "create" | "update" | "delete";
   data?: any;
   id?: number;
@@ -37,8 +44,10 @@ const FormModal = ({
           Delete
         </button>
       </form>
+    ) : type === "create" || type === "update" ? (
+      forms[table](type, data)
     ) : (
-      <p className="text-center">Create or update form will go here.</p>
+      "Form not found"
     );
   };
 

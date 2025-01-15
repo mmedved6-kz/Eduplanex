@@ -6,9 +6,9 @@ const StudentPage = () => {
     return (
         <div className="p-4 flex gap-4 flex-col xl:flex-row">
             {/* LEFT SIDE */}
-            <div className="w-full">
-                <div className="h-full bg-white p-4 rounded-md">
-                    <h1 className="text-xl font-semibold">Schedule</h1>
+            <div className="h-screen w-full flex flex-col justify-between bg-white p-2 rounded-lg shadow-sm overflow-hidden">
+                <h1 className="text-lg font-semibold mb-2">Schedule</h1>
+                <div className="flex-1 overflow-hidden">
                     <BigCalendar />
                 </div>
             </div>

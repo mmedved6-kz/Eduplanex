@@ -4,10 +4,10 @@ import EventCalendar from "@/app/components/EventCalendar";
 
 const StaffPage = () => {
     return (
-        <div className="flex-1 p-4 flex gap-4 flex-col xl:flex-row">
+        <div className="flex-1 p-4 flex gap-4 flex-col xl:flex-row h-screen overflow-hidden">
             {/* LEFT SIDE */}
-            <div className="w-full">
-                <div className="h-full bg-white p-4 rounded-md">
+            <div className="w-full h-full flex flex-col">
+                <div className="flex-1 bg-white p-4 rounded-md overflow-hidden">
                     <h1 className="text-xl font-semibold">Schedule</h1>
                     <BigCalendar />
                 </div>
