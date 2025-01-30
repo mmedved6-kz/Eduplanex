@@ -1,8 +1,23 @@
 const express = require('express');
+const moduleController = require('../controllers/moduleController');
 const router = express.Router();
-const { getModules, createModule } = require('../controllers/moduleController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.get('/', getModules);
-router.post('/', createModule);
+router.use(authMiddleware);
+
+// GET /api/modules
+router.get('/', moduleController.getAllModules);
+
+// GET /api/modules/:id
+router.get('/:id', moduleController.getModuleById);
+
+// POST /api/modules
+router.post('/', moduleController.createModule);
+
+// PUT /api/modules/:id
+router.put('/:id', moduleController.updateModule);
+
+// DELETE /api/modules/:id
+router.delete('/:id', moduleController.deleteModule);
 
 module.exports = router;
