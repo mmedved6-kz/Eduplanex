@@ -60,24 +60,32 @@ const columns = [
 const StaffListPage = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     const getStaffData = async () => {
       try {
-        const data = await fetchStaffData();
-        setStaff(data);
+        const data = await fetchStaffData(currentPage, pageSize);
+        setStaff(data.items || []);
+        setTotalPages(data.totalPages || 1);
       } catch (error) {
         setError("Failed to load staff data. Please try again later.");
       }
     };
 
     getStaffData();
-  }, []);
+  }, [currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   if (error) {
-    return <div className="text-red-500">{error}</div>
+    return <div className="text-red-500">{error}</div>;
   }
-  
+
   const renderInfoCell = (item: Staff) => (
     <div className="flex items-center gap-4 p-4">
       <Image
@@ -88,7 +96,9 @@ const StaffListPage = () => {
         className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
       />
       <div className="flex flex-col">
-        <h3 className="font-semibold">{item.name} {item.surname}</h3>
+        <h3 className="font-semibold">
+          {item.name} {item.surname}
+        </h3>
         <p className="text-xs text-gray-400">{item.email}</p>
       </div>
     </div>
@@ -101,12 +111,15 @@ const StaffListPage = () => {
           <Image src="/view.png" alt="" width={14} height={14} />
         </button>
       </Link>
-      <FormModal table="staff" type="delete" id={Number(item.id)}/>
+      <FormModal table="staff" type="delete" id={Number(item.id)} />
     </div>
   );
-  
+
   const renderRow = (item: Staff) => (
-    <tr key={item.id} className="border-b border-gray-100 even:bg-gray-50 text-sm hover:bg-gray-100">
+    <tr
+      key={item.id}
+      className="border-b border-gray-100 even:bg-gray-50 text-sm hover:bg-gray-100"
+    >
       <td>{renderInfoCell(item)}</td>
       <td className="hidden md:table-cell">{item.id}</td>
       <td className="hidden md:table-cell">{item.departmentName || "N/A"}</td>
@@ -135,11 +148,14 @@ const StaffListPage = () => {
       </div>
       <Table columns={columns} renderRow={renderRow} data={staff} />
       <div className="">
-        <Pagination />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
       </div>
     </div>
   );
 };
 
 export default StaffListPage;
-

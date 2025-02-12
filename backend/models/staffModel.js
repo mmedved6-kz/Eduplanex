@@ -2,26 +2,15 @@ const db = require('../config/db');
 
 const Staff = {
     // Get all staff
-    getAll: async () => {
+    getAll: async (limit, offset) => {
         return await db.any(`
           SELECT 
-            s.id, 
-            s.username, 
-            s.name, 
-            s.surname, 
-            s.email, 
-            s.phone, 
-            s.address, 
-            s.img, 
-            s.sex, 
-            s.createdAt, 
-            s.updatedAt, 
-            s.birthday, 
-            s.departmentId, 
+            s.*, 
             d.name AS departmentName
           FROM Staff s
-          INNER JOIN Department d ON s.departmentId = d.id
-        `);
+          LEFT JOIN Department d ON s.departmentId = d.id
+          LIMIT $1 OFFSET $2
+        `, [limit, offset]);
       },
 
     // Get a staff member by ID
@@ -61,6 +50,10 @@ const Staff = {
     delete: async (id) => {
         return await db.none('DELETE FROM Staff WHERE id = $1', [id]);
     },
+
+    count: async () => {
+        return await db.one('SELECT COUNT(*) FROM Staff');
+      },
 };
 
 module.exports = Staff;
