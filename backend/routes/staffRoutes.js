@@ -3,9 +3,9 @@ const staffController = require('../controllers/staffController');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const validationRequest = require('../middleware/validationMiddleware');
-const staffSchema = require('../validationSchemas/studentSchema');
+const staffSchema = require('../validationSchemas/staffSchema');
 
-router.use(authMiddleware);
+//router.use(authMiddleware);
 
 // GET /api/staff
 router.get('/', staffController.getAllStaff);
