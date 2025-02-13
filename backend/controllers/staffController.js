@@ -3,11 +3,11 @@ const StaffDTO = require("../dto/staffDTO");
 
 const getAllStaff = async (req, res) => {
   try {
-    const { page = 1, pageSize = 10 } = req.query;
+    const { page = 1, pageSize = 10, search = '', sortColumn = 's.name', sortOrder = 'ASC'} = req.query;
     const limit = parseInt(pageSize);
     const offset = (parseInt(page) - 1) * limit;
-    const staff = await Staff.getAll(limit, offset);
-    const totalStaff = await Staff.count();
+    const staff = await Staff.getAll(limit, offset, search, sortColumn, sortOrder);
+    const totalStaff = await Staff.count(search);
     const totalPages = Math.ceil(totalStaff.count / limit);
     const staffDTOs = staff.map((staff) => new StaffDTO(staff));
     res.json({

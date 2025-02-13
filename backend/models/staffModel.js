@@ -2,15 +2,24 @@ const db = require('../config/db');
 
 const Staff = {
     // Get all staff
-    getAll: async (limit, offset) => {
+    getAll: async (limit, offset, searchQuery, sortColumn, sortOrder) => {
+        // Validate sortColumn and sortOrder preventing SQL injection
+        const validColumns = ['s.name', 'd.name', 's.email', 's.phone', 's.surname', 's.id'];
+        const defaultSort = 's.name';
+        
+        const actualSortColumn = validColumns.includes(sortColumn) ? sortColumn : defaultSort;
+        const actualSortOrder = ['ASC', 'DESC'].includes(sortOrder) ? sortOrder : 'ASC';
+        
         return await db.any(`
-          SELECT 
-            s.*, 
-            d.name AS departmentName
-          FROM Staff s
-          LEFT JOIN Department d ON s.departmentId = d.id
-          LIMIT $1 OFFSET $2
-        `, [limit, offset]);
+            SELECT 
+                s.*, 
+                d.name AS departmentName
+            FROM Staff s
+            LEFT JOIN Department d ON s.departmentId = d.id
+            WHERE s.name ILIKE $1 OR s.email ILIKE $1 OR d.name ILIKE $1
+            ORDER BY ${actualSortColumn} ${actualSortOrder}
+            LIMIT $2 OFFSET $3
+        `, [`%${searchQuery}%`, limit, offset]);
       },
 
     // Get a staff member by ID

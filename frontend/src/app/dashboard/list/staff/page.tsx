@@ -2,6 +2,7 @@
 
 import FormModal from "@/app/components/FormModal";
 import Pagination from "@/app/components/Pagination";
+import SortPanel from "@/app/components/SortPanel";
 import Table from "@/app/components/Table";
 import TableSearch from "@/app/components/TableSearch";
 import { fetchStaffData } from "@/app/lib/utils/fetch";
@@ -63,11 +64,15 @@ const StaffListPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 10;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState('s.name');
+  const [sortOrder, setSortOrder] = useState('ASC');
+  const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
 
   useEffect(() => {
     const getStaffData = async () => {
       try {
-        const data = await fetchStaffData(currentPage, pageSize);
+        const data = await fetchStaffData(currentPage, pageSize, searchQuery, sortColumn, sortOrder);
         setStaff(data.items || []);
         setTotalPages(data.totalPages || 1);
       } catch (error) {
@@ -76,10 +81,21 @@ const StaffListPage = () => {
     };
 
     getStaffData();
-  }, [currentPage]);
+  }, [currentPage, searchQuery, sortColumn, sortOrder]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1); 
+  };
+
+  const handleSortApply = (column: string, order: string) => {
+    setSortColumn(column);
+    setSortOrder(order);
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   if (error) {
@@ -133,15 +149,27 @@ const StaffListPage = () => {
     <div className="bg-white p-4 flex-1">
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Staff</h1>
-        <div className=" flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
-          <div className="flex items-center gap-4 self-end">
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+          <TableSearch onSearch={handleSearch} />
+          <div className="flex items-center gap-4 self-end relative">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
               <Image src="/filter.png" alt="Filter" width={14} height={14} />
             </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
-              <Image src="/sort.png" alt="Sort" width={14} height={14} />
-            </button>
+            <div className="relative">
+              <button 
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]" 
+                onClick={() => setIsSortPanelOpen(!isSortPanelOpen)}
+              >
+                <Image src="/sort.png" alt="Sort" width={14} height={14} />
+              </button>
+              <SortPanel 
+                isOpen={isSortPanelOpen}
+                onClose={() => setIsSortPanelOpen(false)}
+                onApply={handleSortApply}
+                currentColumn={sortColumn}
+                currentOrder={sortOrder}
+              />
+            </div>
             <FormModal table="staff" type="create" />
           </div>
         </div>
