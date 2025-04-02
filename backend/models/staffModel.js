@@ -2,33 +2,55 @@ const db = require('../config/db');
 
 const Staff = {
     // Get all staff
-    getAll: async (limit, offset, searchQuery, sortColumn, sortOrder) => {
-        // Validate sortColumn and sortOrder preventing SQL injection
-        const validColumns = ['s.name', 'd.name', 's.email', 's.phone', 's.surname', 's.id'];
-        const defaultSort = 's.name';
+    getAll: async (limit, offset, searchQuery, sortColumn, sortOrder, filters) => {
+        // Validate sortColumn and sortOrder preventing SQL injection - CAN BE IGNORED OR REMOVED LATER
+        const validColumns = ['staff.name', 'department.name', 'staff.email', 'staff.phone', 'staff.surname', 'staff.id'];
+        const defaultSort = 'staff.name';
         
         const actualSortColumn = validColumns.includes(sortColumn) ? sortColumn : defaultSort;
         const actualSortOrder = ['ASC', 'DESC'].includes(sortOrder) ? sortOrder : 'ASC';
         
-        return await db.any(`
+        const params = [`%${searchQuery}%`, limit, offset];
+        
+        let query = `
             SELECT 
-                s.*, 
-                d.name AS departmentName
-            FROM Staff s
-            LEFT JOIN Department d ON s.departmentId = d.id
-            WHERE s.name ILIKE $1 OR s.email ILIKE $1 OR d.name ILIKE $1
-            ORDER BY ${actualSortColumn} ${actualSortOrder}
-            LIMIT $2 OFFSET $3
-        `, [`%${searchQuery}%`, limit, offset]);
-      },
+                staff.*, 
+                department.name AS departmentName
+            FROM Staff staff
+            LEFT JOIN Department department ON staff.departmentId = department.id
+            WHERE (staff.name ILIKE $1 OR staff.email ILIKE $1 OR department.name ILIKE $1)
+        `;
+
+        if (filters.departmentId) {
+            const departmentId = parseInt(filters.departmentId);
+            if (!isNaN(departmentId)) {
+              params.push(departmentId);
+              query += ` AND department.id = $${params.length}`;
+            }
+          }
+
+        if (filters.sex) {
+            // Validate sex value against allowed enum values
+            const validSexValues = ['MALE', 'FEMALE'];
+            if (validSexValues.includes(filters.sex.toUpperCase())) {
+                params.push(filters.sex.toUpperCase());
+                query += ` AND staff.sex = $${params.length}`
+            }
+        }
+
+        query += ` ORDER BY ${actualSortColumn} ${actualSortOrder}
+                  LIMIT $2 OFFSET $3`;
+
+        return await db.any(query, params);
+    },
 
     // Get a staff member by ID
     getById: async (id) => {
         return await db.oneOrNone(`
-            SELECT s.*, d.name as departmentName 
-            FROM Staff s
-            JOIN Department d ON s.departmentId = d.id
-            WHERE s.id = $1
+            SELECT staff.*, department.name as departmentName 
+            FROM Staff staff
+            JOIN Department department ON staff.departmentId = department.id
+            WHERE staff.id = $1
         `, [id]);
     },
 
@@ -60,9 +82,28 @@ const Staff = {
         return await db.none('DELETE FROM Staff WHERE id = $1', [id]);
     },
 
-    count: async () => {
-        return await db.one('SELECT COUNT(*) FROM Staff');
-      },
+    count: async (searchQuery, filters) => {
+        const params = [`%${searchQuery}%`];
+        
+        let query = `
+            SELECT COUNT(*) 
+            FROM Staff staff
+            LEFT JOIN Department department ON staff.departmentId = department.id
+            WHERE (staff.name ILIKE $1 OR staff.email ILIKE $1 OR department.name ILIKE $1)
+        `;
+
+        if (filters.departmentId) {
+            params.push(filters.departmentId);
+            query += ` AND department.id = $${params.length}`;
+        }
+
+        if (filters.sex) {
+            params.push(filters.sex);
+            query += ` AND staff.sex = $${params.length}`;
+        }
+
+        return await db.one(query, params);
+    },
 };
 
 module.exports = Staff;

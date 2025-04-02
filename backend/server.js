@@ -3,6 +3,7 @@ const studentRoutes = require('./routes/studentRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
 const courseRoutes = require('./routes/courseRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
 //const authRoutes = require('./routes/authRoutes'); // Add this line
 const errorMiddleware = require('./middleware/errorMiddleware');
 const cors = require('cors'); // Add this line
@@ -19,6 +20,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/departments', departmentRoutes);
 //app.use('/api/auth', authRoutes); // Add this line
 
 // Error handling middleware

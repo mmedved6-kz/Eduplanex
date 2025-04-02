@@ -6,22 +6,43 @@ interface SortPanelProps {
   onApply: (column: string, order: string) => void;
   currentColumn: string;
   currentOrder: string;
+  entityType: 'staff' | 'student' | 'course' | 'module';
 }
 
-const SortPanel = ({ isOpen, onClose, onApply, currentColumn, currentOrder }: SortPanelProps) => {
+const SortPanel = ({ isOpen, onClose, onApply, currentColumn, currentOrder, entityType }: SortPanelProps) => {
   const [selectedColumn, setSelectedColumn] = useState(currentColumn);
   const [selectedOrder, setSelectedOrder] = useState(currentOrder);
 
   if (!isOpen) return null;
 
-  const columnOptions = [
-    { value: 's.name', label: 'Name' },
-    { value: 'd.name', label: 'Department' },
-    { value: 's.email', label: 'Email' },
-    { value: 's.phone', label: 'Phone' },
-    { value: 's.surname', label: 'Surname' },
-    { value: 's.id', label: 'Staff ID' },
-  ];
+  const columnOptions = {
+    staff: [
+      { value: 'staff.name', label: 'Name' },
+      { value: 'department.name', label: 'Department' },
+      { value: 'staff.email', label: 'Email' },
+      { value: 'staff.phone', label: 'Phone' },
+      { value: 'staff.surname', label: 'Surname' },
+      { value: 'staff.id', label: 'Staff ID' },
+    ],
+    student: [
+      { value: 'student.name', label: 'Name' },
+      { value: 'course.name', label: 'Course' },
+      { value: 'student.email', label: 'Email' },
+      { value: 'student.phone', label: 'Phone' },
+      { value: 'student.surname', label: 'Surname' },
+      { value: 'student.id', label: 'Student ID' },
+    ],
+    course: [
+      { value: 'course.name', label: 'Name' },
+      { value: 'department.name', label: 'Department' },
+      { value: 'course.code', label: 'Code' },
+    ],
+    module: [
+      { value: 'module.name', label: 'Name' },
+      { value: 'course.name', label: 'Course' },
+      { value: 'module.code', label: 'Code' },
+    ],
+  };
 
   const orderOptions = [
     { value: 'ASC', label: 'Ascending' },
@@ -45,7 +66,7 @@ const SortPanel = ({ isOpen, onClose, onApply, currentColumn, currentOrder }: So
             onChange={(e) => setSelectedColumn(e.target.value)}
             className="w-full rounded-md border border-gray-300 p-2 text-sm"
           >
-            {columnOptions.map((option) => (
+            {columnOptions[entityType].map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

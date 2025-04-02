@@ -1,5 +1,6 @@
 "use client";
 
+import FilterPanel, { FilterOptions } from "@/app/components/FilterPanel";
 import FormModal from "@/app/components/FormModal";
 import Pagination from "@/app/components/Pagination";
 import SortPanel from "@/app/components/SortPanel";
@@ -65,14 +66,19 @@ const StaffListPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 10;
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState('s.name');
+  const [sortColumn, setSortColumn] = useState('staff.name');
   const [sortOrder, setSortOrder] = useState('ASC');
   const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    departmentId: null,
+    sex: null,
+  });
 
   useEffect(() => {
     const getStaffData = async () => {
       try {
-        const data = await fetchStaffData(currentPage, pageSize, searchQuery, sortColumn, sortOrder);
+        const data = await fetchStaffData(currentPage, pageSize, searchQuery, sortColumn, sortOrder, filters);
         setStaff(data.items || []);
         setTotalPages(data.totalPages || 1);
       } catch (error) {
@@ -81,7 +87,7 @@ const StaffListPage = () => {
     };
 
     getStaffData();
-  }, [currentPage, searchQuery, sortColumn, sortOrder]);
+  }, [currentPage, searchQuery, sortColumn, sortOrder, filters]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -98,6 +104,21 @@ const StaffListPage = () => {
     setCurrentPage(1); // Reset to first page when sorting changes
   };
 
+  const handleFilterApply = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
+  const toggleFilterPanel = () => {
+    setIsFilterPanelOpen(!isFilterPanelOpen);
+    if (isSortPanelOpen) setIsSortPanelOpen(false);
+  };
+
+  const toggleSortPanel = () => {
+    setIsSortPanelOpen(!isSortPanelOpen);
+    if (isFilterPanelOpen) setIsFilterPanelOpen(false);
+  };
+
   if (error) {
     return <div className="text-red-500">{error}</div>;
   }
@@ -105,7 +126,7 @@ const StaffListPage = () => {
   const renderInfoCell = (item: Staff) => (
     <div className="flex items-center gap-4 p-4">
       <Image
-        src={item.img || "/avatar.png"} // Use a default image if img is empty
+        src={item.img || "/avatar.png"} 
         alt="Image"
         width={40}
         height={40}
@@ -152,13 +173,21 @@ const StaffListPage = () => {
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
           <TableSearch onSearch={handleSearch} />
           <div className="flex items-center gap-4 self-end relative">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
+            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]"
+              onClick={toggleFilterPanel}>
               <Image src="/filter.png" alt="Filter" width={14} height={14} />
             </button>
+            <FilterPanel
+              isOpen={isFilterPanelOpen}
+              onClose={() => setIsFilterPanelOpen(false)}
+              onApply={handleFilterApply}
+              currentFilters={filters}
+              entityType="staff"
+            />
             <div className="relative">
               <button 
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]" 
-                onClick={() => setIsSortPanelOpen(!isSortPanelOpen)}
+                onClick={toggleSortPanel}
               >
                 <Image src="/sort.png" alt="Sort" width={14} height={14} />
               </button>
@@ -168,6 +197,7 @@ const StaffListPage = () => {
                 onApply={handleSortApply}
                 currentColumn={sortColumn}
                 currentOrder={sortOrder}
+                entityType="staff"
               />
             </div>
             <FormModal table="staff" type="create" />

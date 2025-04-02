@@ -4,9 +4,36 @@ const StudentDTO = require('../dto/studentDTO');
 // Get all students
 const getAllStudents = async (req, res) => {
     try {
-        const students = await Student.getAll();
+        const {
+            page = 1,
+            pageSize = 10,
+            search = '', 
+            sortColumn = 'student.name', 
+            sortOrder = 'ASC',
+            courseId = null,
+            sex = null
+        } = req.query;
+
+        const filters = {
+            courseId: courseId ? parseInt(courseId) : null,
+            sex: sex || null
+          };
+      
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+
+        const students = await Student.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+        const totalStudents = await Student.count(search, filters);
+        const totalPages = Math.ceil(totalStudents.count / limit);
+
         const studentDTOs = students.map(student => new StudentDTO(student));
-        res.json(studentDTOs);
+        res.json({
+            items: studentDTOs,
+            currentPage: parseInt(page),
+            totalPages, 
+            totalItems: totalStudents.count,
+            pageSize: limit,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

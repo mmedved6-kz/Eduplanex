@@ -3,7 +3,7 @@ const courseController = require('../controllers/courseController');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 
-router.use(authMiddleware);
+//router.use(authMiddleware);
 
 // GET /api/courses
 router.get('/', courseController.getAllCourses);

@@ -3,12 +3,28 @@ const StaffDTO = require("../dto/staffDTO");
 
 const getAllStaff = async (req, res) => {
   try {
-    const { page = 1, pageSize = 10, search = '', sortColumn = 's.name', sortOrder = 'ASC'} = req.query;
+    const { 
+      page = 1, 
+      pageSize = 10, 
+      search = '', 
+      sortColumn = 'staff.name', 
+      sortOrder = 'ASC',
+      departmentId = null,
+      sex = null
+    } = req.query;
+
+    const filters = {
+      departmentId: departmentId ? parseInt(departmentId) : null,
+      sex: sex || null
+    };
+
     const limit = parseInt(pageSize);
     const offset = (parseInt(page) - 1) * limit;
-    const staff = await Staff.getAll(limit, offset, search, sortColumn, sortOrder);
-    const totalStaff = await Staff.count(search);
+    
+    const staff = await Staff.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+    const totalStaff = await Staff.count(search, filters);
     const totalPages = Math.ceil(totalStaff.count / limit);
+    
     const staffDTOs = staff.map((staff) => new StaffDTO(staff));
     res.json({
       items: staffDTOs,

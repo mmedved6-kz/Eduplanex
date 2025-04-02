@@ -5,7 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const validationRequest = require('../middleware/validationMiddleware');
 const studentSchema = require('../validationSchemas/studentSchema');
 
-router.use(authMiddleware);
+//router.use(authMiddleware);
 
 // GET /api/students
 router.get('/', studentController.getAllStudents);
