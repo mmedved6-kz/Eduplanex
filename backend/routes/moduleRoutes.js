@@ -3,7 +3,7 @@ const moduleController = require('../controllers/moduleController');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 
-router.use(authMiddleware);
+//router.use(authMiddleware);
 
 // GET /api/modules
 router.get('/', moduleController.getAllModules);

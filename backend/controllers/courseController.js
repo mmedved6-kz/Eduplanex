@@ -10,11 +10,12 @@ const getAllCourses = async (req, res) => {
             search = '', 
             sortColumn = 'course.name', 
             sortOrder = 'ASC',
+            departmentId = null,
         } = req.query;
 
         const filters = {
-
-          };
+            departmentId: departmentId || null
+        };
       
         const limit = parseInt(pageSize);
         const offset = (parseInt(page) - 1) * limit;
