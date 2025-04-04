@@ -4,9 +4,34 @@ const ModuleDTO = require('../dto/moduleDTO');
 // Get all modules
 const getAllModules = async (req, res) => {
     try {
-        const modules = await Module.getAll();
+        const {
+            page = 1,
+            pageSize = 10,
+            search = '', 
+            sortColumn = 'module.name', 
+            sortOrder = 'ASC',
+            courseId = null,
+        } = req.query;
+
+        const filters = {
+            courseId: courseId ? parseInt(courseId) : null,
+          };
+      
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+
+        const modules = await Module.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+        const totalModules = await Module.count(search, filters);
+        const totalPages = Math.ceil(totalModules.count / limit);
+
         const moduleDTOs = modules.map(module => new ModuleDTO(module));
-        res.json(moduleDTOs);
+        res.json({
+            items: moduleDTOs,
+            currentPage: parseInt(page),
+            totalPages,
+            totalItems: totalModules.count,
+            pageSize: limit,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

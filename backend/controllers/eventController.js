@@ -4,9 +4,33 @@ const EventDto = require('../dto/eventDto');
 // Get all events
 const getAllEvents = async (req, res) => {
     try {
-        const events = await Event.getAll();
+        const {
+            page = 1,
+            pageSize = 10,
+            search = '',
+            sortColumn = 'event.name',
+            sortOrder = 'ASC',
+        } = req.query;
+
+        const filters = {
+
+        };
+
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+
+        const events = await Event.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+        const totalEvents = await Event.count(search, filters);
+        const totalPages = Math.ceil(totalEvents.count / limit);
+
         const eventDtos = events.map(event => new EventDto(event));
-        res.json(eventDtos);
+        res.json({
+            items: eventDtos,
+            currentPage: parseInt(page),
+            totalPages,
+            totalItems: totalEvents.count,
+            pageSize: limit,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -4,9 +4,33 @@ const DepartmentDto = require('../dto/departmentDto');
 // Get all Departments
 const getAllDepartments = async (req, res) => {
     try {
-        const departments = await Department.getAll();
+        const {
+            page = 1,
+            pageSize = 1,
+            search = '', 
+            sortColumn = 'staff.name', 
+            sortOrder = 'ASC',
+        } = req.query;
+
+        const filters = {
+
+        };
+
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+
+        const departments = await Department.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+        const totalDepartments = await Department.count(search, filters);
+        const totalPages = Math.ceil(totalDepartments.count / limit);
+        
         const departmentDtos = departments.map(department => new DepartmentDto(department));
-        res.json(departmentDtos);
+        res.json({
+            items: departmentDtos,
+            currentPage: parseInt(page),
+            totalPages,
+            totalItems: totalDepartments.count,
+            pageSize: limit,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

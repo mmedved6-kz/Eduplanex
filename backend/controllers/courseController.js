@@ -4,9 +4,33 @@ const CourseDTO = require('../dto/courseDTO');
 // Get all courses
 const getAllCourses = async (req, res) => {
     try {
-        const courses = await Course.getAll();
+        const {
+            page = 1,
+            pageSize = 10,
+            search = '', 
+            sortColumn = 'course.name', 
+            sortOrder = 'ASC',
+        } = req.query;
+
+        const filters = {
+
+          };
+      
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+        
+        const courses = await Course.getAll( limit, offset, search, sortColumn, sortOrder, filters);
+        const totalCourses = await Course.count(search, filters);
+        const totalPages = Math.ceil(totalCourses.count / limit);
+        
         const courseDTOs = courses.map(course => new CourseDTO(course));
-        res.json(courseDTOs);
+        res.json({
+            items: courseDTOs,
+            currentPage: parseInt(page),
+            totalPages,
+            totalItems: totalCourses.count,
+            pageSize: limit,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
