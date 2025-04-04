@@ -12,12 +12,9 @@ const Student = {
         const params = [`%${searchQuery}%`, limit, offset];
 
         let query = `
-            SELECT 
-                student.*,
-                course.name AS courseName
-            FROM Student student
-            LEFT JOIN Course course ON student.courseId = course.id
-            WHERE (student.name ILIKE $1 OR student.email ILIKE $1 OR course.name ILIKE $1)
+            SELECT *
+            FROM Student
+            WHERE (name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1)
         `;
 
         if (filters.courseId) {
@@ -45,9 +42,8 @@ const Student = {
     // Get a student by ID
     getById: async (id) => {
         return await db.oneOrNone(`
-            SELECT student.*, course.name as courseName 
-            FROM Student student 
-            JOIN Course course ON student.courseId = course.id
+            SELECT *
+            FROM Student
             WHERE id = $1
             `, [id]);
     },
@@ -56,8 +52,10 @@ const Student = {
     create: async (student) => {
         const { username, name, surname, email, phone, address, img, sex, classId, courseId, moduleId, birthday } = student;
         return await db.one(
-            `INSERT INTO Student (username, name, surname, email, phone, address, img, sex, classId, courseId, moduleId, birthday) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
-            RETURNING *, (SELECT name from Course WHERE id = $9) as courseName`,
+            `INSERT INTO Student 
+             (username, name, surname, email, phone, address, img, sex, birthday) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+             RETURNING *`,
             [username, name, surname, email, phone, address, img, sex, classId, courseId, moduleId, birthday]
         );
     },
@@ -66,7 +64,7 @@ const Student = {
     update: async (id, updates) => {
         const { name, email } = updates;
         return await db.one(
-            'UPDATE Student SET name = $1, email = $2 WHERE id = $3 RETURNING *, (SELECT name FROM Course WHERE id = Student.courseId) as courseName',
+            'UPDATE Student SET name = $1, email = $2, phone = $3 WHERE id = $4 RETURNING *',
             [name, email, id]
         );
     },
@@ -82,15 +80,9 @@ const Student = {
     
     let query = `
       SELECT COUNT(*) 
-      FROM Student student
-      LEFT JOIN Course course ON student.courseId = course.id
-      WHERE (student.name ILIKE $1 OR student.email ILIKE $1 OR course.name ILIKE $1)
+            FROM Student
+            WHERE (name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1)
     `;
-
-    if (filters.courseId) {
-      params.push(filters.courseId);
-      query += ` AND student.courseId = $${params.length}`;
-    }
 
     if (filters.sex) {
       params.push(filters.sex);

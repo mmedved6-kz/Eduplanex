@@ -6,9 +6,8 @@ class RoomDto {
         this.buildingId = room.buildingid;
         this.buildingName = room.buildingname;
         this.capacity = room.capacity;
-        this.type = room.type;
-        this.createdAt = room.createdat;
-        this.updatedAt = room.updatedat;
+        this.type = room.room_type;
+        this.equipment = room.equipment;
     }
 }
 

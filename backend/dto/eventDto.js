@@ -3,24 +3,26 @@ class EventDto {
         this.id = event.id;
         this.title = event.title;
         this.description = event.description;
-        this.startTime = event.starttime;
-        this.endTime = event.endtime;
-        this.eventType = event.eventtype;
+        
+        // Format dates properly to ISO strings for reliable parsing in frontend
+        this.startTime = event.start_time ? new Date(event.start_time).toISOString() : null;
+        this.endTime = event.end_time ? new Date(event.end_time).toISOString() : null;
+        
+        this.startDate = this.startTime ? new Date(this.startTime).toLocaleDateString() : "N/A";
+        this.startTimeFormatted = this.startTime ? new Date(this.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A";
+        
+        this.endDate = this.endTime ? new Date(this.endTime).toLocaleDateString() : "N/A";
+        this.endTimeFormatted = this.endTime ? new Date(this.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A";
+        
+        // Other fields as before
+        this.tag = event.tag;
         this.moduleId = event.moduleid;
-        this.moduleName = event.modulename;
+        this.moduleName = event.modulename || "N/A";
         this.roomId = event.roomid;
-        this.roomName = event.roomname;
+        this.roomName = event.roomname || "N/A";
         this.staffId = event.staffid;
-        this.staffName = event.staffname;
-        this.studentId = event.studentid;
-        this.studentName = event.studentname;
-        this.createdAt = event.createdat;
-        this.updatedAt = event.updatedat;
-
-        this.maxCapacity = event.maxcapacity;
-        this.studentIds = event.studentids || [];
-        this.studentCount = event.studentcount; 
-        this.resources = event.resources || [];
+        this.staffName = event.staffname || "N/A";
+        this.studentCount = event.studentcount || 0;
     }
 }
 

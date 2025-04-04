@@ -83,10 +83,21 @@ const deleteEvent = async (req, res) => {
     }
 };
 
+const getCalendarEvents = async (req, res) => {
+    try {
+        const events = await Event.getAll(1000, 0, '', 'event.start_time', 'ASC', {});
+        const eventDtos = events.map(event => new EventDto(event));
+        res.json({ items: eventDtos });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getAllEvents,
     getEventById,
     createEvent,
     updateEvent,
     deleteEvent,
+    getCalendarEvents,
 };

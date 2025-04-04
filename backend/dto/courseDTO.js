@@ -2,13 +2,11 @@ class CourseDTO {
     constructor(course) {
         this.id = course.id;
         this.name = course.name;
+        this.description = course.description;
+        this.creditHourse = course.credit_hours;
         this.departmentId = course.departmentid;
         this.departmentName = course.departmentname;
-        this.coordinatorId = course.coordinatorid;
-        this.coordinatorName = course.coordinatorname;
-        this.durationYears = course.durationyears;
         this.createdAt = course.createdat;
-        this.updatedAt = course.updatedat;
     }
 }
 

@@ -9,8 +9,8 @@ class StaffDTO {
         this.address = staff.address;
         this.img = staff.img;
         this.sex = staff.sex;
+        this.position = staff.position;
         this.createdAt = staff.createdat;
-        this.updatedAt = staff.updatedat;
         this.birthday = staff.birthday;
         this.departmentId = staff.departmentid;
         this.departmentName = staff.departmentname;

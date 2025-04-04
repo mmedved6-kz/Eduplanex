@@ -3,11 +3,10 @@ class StudentDTO {
         this.id = student.id;
         this.name = student.name;
         this.email = student.email;
-        this.courseId = student.courseid;
-        this.courseName = student.coursename;
         this.surname = student.surname;
         this.phone = student.phone;
-        this.address = student.address;
+        this.sex = student.sex;
+        this.enrollmentDate = student.enrollment_date;
         this.createdAt = student.createdat;
         this.updatedAt = student.updatedat;
     }
