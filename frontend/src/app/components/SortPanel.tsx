@@ -6,7 +6,7 @@ interface SortPanelProps {
   onApply: (column: string, order: string) => void;
   currentColumn: string;
   currentOrder: string;
-  entityType: 'staff' | 'student' | 'course' | 'module';
+  entityType: 'staff' | 'student' | 'course' | 'module' | 'department' | 'event'; // Add other entity types as needed
 }
 
 const SortPanel = ({ isOpen, onClose, onApply, currentColumn, currentOrder, entityType }: SortPanelProps) => {
@@ -32,15 +32,26 @@ const SortPanel = ({ isOpen, onClose, onApply, currentColumn, currentOrder, enti
       { value: 'student.surname', label: 'Surname' },
       { value: 'student.id', label: 'Student ID' },
     ],
+    department: [
+      { value: 'department.name', label: 'Name' },
+      { value: 'department.created_at', label: 'Created Date' },
+      { value: 'department.updated_at', label: 'Updated Date' },
+    ],
     course: [
       { value: 'course.name', label: 'Name' },
       { value: 'department.name', label: 'Department' },
-      { value: 'course.code', label: 'Code' },
+      { value: 'course.credit_hours', label: 'Credit Hours' },
     ],
     module: [
       { value: 'module.name', label: 'Name' },
       { value: 'course.name', label: 'Course' },
-      { value: 'module.code', label: 'Code' },
+      { value: 'module.semester', label: 'Semester' },
+    ],  
+    event: [
+      { value: 'event.title', label: 'Title' },
+      { value: 'module.name', label: 'Module' },
+      { value: 'staff.name', label: 'Staff' },
+      { value: 'event.tag', label: 'Type' }
     ],
   };
 

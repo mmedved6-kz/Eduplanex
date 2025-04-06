@@ -2,15 +2,16 @@
 
 import Image from "next/image";
 import { JSX, useCallback, useEffect, useState } from "react";
-import TeacherForm from "./forms/TeacherForm";
+
+import StaffForm from "./forms/StaffForm";
 
 type TableType = "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event";
 type FormType = "create" | "update" | "delete";
 
 const forms:{
-  [key:string]:(type:"create" | "update", data?:any) => JSX.Element;
+  [key:string]:(type:"create" | "update", data?:any, onClose?: () => void) => JSX.Element;
 } = {
-  staff: (type, data) => <TeacherForm type={type} data={data} />,
+  staff: (type, data, onClose) => <StaffForm type={type} data={data} onClose={onClose} />,
 };
 
 const FormModal = ({
@@ -22,7 +23,7 @@ const FormModal = ({
   table: TableType;
   type: FormType;
   data?: any;
-  id?: number;
+  id?: string | number;
 }) => {
 
   const [open, setOpen] = useState(false);
@@ -92,7 +93,7 @@ const FormModal = ({
     };
 
     if ((type === "create" || type === "update") && forms[table]) {
-      return forms[table](type, data);  
+      return forms[table](type, data, handleClose);  
     }
 
     return <div className="p-4 text-red-500">Form not found</div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchDepartments, fetchCourses } from '../lib/utils/fetch';
+import { fetchDepartments, fetchCourses, fetchStaff } from '../lib/utils/fetch';
 
 export type UserSex = 'MALE' | 'FEMALE';
 
@@ -7,6 +7,11 @@ export interface FilterOptions {
   departmentId?: number | null;
   sex?: UserSex | null;
   courseId?: number | null;
+  moduleId?: number | null;
+  staffId?: string | null;
+  roomId?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 interface FilterPanelProps {
@@ -14,9 +19,8 @@ interface FilterPanelProps {
   onClose: () => void;
   onApply: (filters: FilterOptions) => void;
   currentFilters: FilterOptions;
-  entityType: 'staff' | 'student' | 'course' | 'module'; 
+  entityType: 'staff' | 'student' | 'course' | 'module' | 'department' | 'event';
 }
-
 
 const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: FilterPanelProps) => {
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(
@@ -28,50 +32,87 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
   const [selectedGender, setSelectedGender] = useState<UserSex | null>(
     currentFilters.sex || null
   );
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(
+    currentFilters.staffId || null
+  );
+  const [selectedStartDate, setSelectedStartDate] = useState<string | null>(
+    currentFilters.startDate || null
+  );
+  const [selectedEndDate, setSelectedEndDate] = useState<string | null>(
+    currentFilters.endDate || null
+  );
 
-  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
-  const [courses, setCourses] = useState<{ id: number; name: string }[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
 
   useEffect(() => {
-    const getDepartments = async () => {
-      try {
-        const data = await fetchDepartments();
-        setDepartments(data);
-      } catch (error) {
-        console.error('Failed to load departments:', error);
-      }
-    };
-
-    const getCourses = async() => {
-      try {
-        const data = await fetchCourses();
-        setCourses(data);
-      } catch(error) {
-        console.error('Failed to load courses:', error);
-      }
-    };
-
     if (isOpen) {
-      if (entityType === 'staff' || entityType === 'student') {
-        getDepartments();
+      // Fetch departments if needed
+      if (['staff', 'student', 'course'].includes(entityType)) {
+        fetchDepartments()
+          .then(data => {
+            if (data?.items) {
+              setDepartments(data.items);
+            } else if (Array.isArray(data)) {
+              setDepartments(data);
+            }
+          })
+          .catch(error => {
+            console.error('Failed to load departments:', error);
+          });
       }
-      if (entityType === 'student' || entityType === 'course') {
-        getCourses();
+
+      // Fetch courses if needed
+      if (['student', 'course', 'module'].includes(entityType)) {
+        fetchCourses()
+          .then(data => {
+            if (data?.items) {
+              setCourses(data.items);
+            } else if (Array.isArray(data)) {
+              setCourses(data);
+            }
+          })
+          .catch(error => {
+            console.error('Failed to load courses:', error);
+          });
+      }
+
+      if (['event'].includes(entityType)) {
+        fetchStaff()
+          .then(data => {
+            if (data?.items) {
+              setStaff(data.items);
+            } else if (Array.isArray(data)) {
+              setStaff(data);
+            }
+          })
+          .catch(error => {
+            console.error('Failed to load staff:', error);
+          });
       }
     }
   }, [isOpen, entityType]);
 
   const handleApply = () => {
     const filters: FilterOptions = {};
-    if (entityType === 'staff' || entityType === 'student') {
+    
+    if (['staff', 'student', 'course'].includes(entityType)) {
       filters.departmentId = selectedDepartment;
     }
-    if (entityType === 'student' || entityType === 'course') {
+    
+    if (['student', 'course', 'module'].includes(entityType)) {
       filters.courseId = selectedCourse;
     }
-    if (entityType === 'staff' || entityType === 'student') {
-      filters.sex = selectedGender ? selectedGender.toUpperCase() as UserSex : null;
+    
+    if (['staff', 'student'].includes(entityType)) {
+      filters.sex = selectedGender;
     }
+    
+    if (['event'].includes(entityType)) {
+      filters.staffId = selectedStaff;
+    }
+    
     onApply(filters);
     onClose();
   };
@@ -80,6 +121,9 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
     setSelectedDepartment(null);
     setSelectedCourse(null);
     setSelectedGender(null);
+    setSelectedStaff(null); 
+    setSelectedStartDate(null);
+    setSelectedEndDate(null);
     onApply({});
     onClose();
   };
@@ -89,7 +133,7 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
   return (
     <div className="absolute right-0 top-full mt-2 bg-white shadow-lg rounded-md p-4 border border-gray-200 z-50 w-64">
       <div className="space-y-4">
-        {(entityType === 'staff' || entityType === 'student') && (
+        {['staff', 'student', 'course'].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Department
@@ -100,7 +144,7 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
               className="w-full rounded-md border border-gray-300 p-2 text-sm"
             >
               <option value="">All Departments</option>
-              {departments.map((dept) => (
+              {departments.map(dept => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
@@ -108,7 +152,8 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
-        {(entityType === 'student' || entityType === 'course') && (
+        
+        {['student', 'course', 'module'].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Course
@@ -119,7 +164,7 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
               className="w-full rounded-md border border-gray-300 p-2 text-sm"
             >
               <option value="">All Courses</option>
-              {courses.map((course) => (
+              {courses.map(course => (
                 <option key={course.id} value={course.id}>
                   {course.name}
                 </option>
@@ -127,7 +172,8 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
-        {(entityType === 'staff' || entityType === 'student') && (
+        
+        {['staff', 'student'].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Gender
@@ -143,6 +189,27 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
+        
+        {['event'].includes(entityType) && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Staff Member
+            </label>
+            <select
+  value={selectedStaff || ''}
+  onChange={(e) => setSelectedStaff(e.target.value || null)}
+  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+>
+  <option value="">All Staff</option> {/* This option is missing */}
+  {staff.map(staff => (
+    <option key={staff.id} value={staff.id}>
+      {staff.name}
+    </option>
+  ))}
+</select>
+          </div>
+        )}
+        
         <div className="flex justify-between pt-2">
           <button
             onClick={handleReset}

@@ -2,8 +2,16 @@ const db = require('../config/db');
 
 const Event = {
     // Get all events
-    getAll: async (limit, offset, search, sortColumn, sortOrder, filters) => {
-      const query = `
+    getAll: async (limit, offset, searchQuery, sortColumn, sortOrder, filters = {}) => {
+      const validColumns = ['event.title', 'module.name', 'event.start_time', 'event.tag'];
+      const defaultSort = 'event.start_time';
+    
+      const actualSortColumn = validColumns.includes(sortColumn) ? sortColumn : defaultSort;
+      const actualSortOrder = ['ASC', 'DESC'].includes(sortOrder) ? sortOrder : 'ASC';
+      
+      const params = [`%${searchQuery}%`, limit, offset];
+    
+      let query = `
         SELECT 
           event.*,
           module.name AS modulename,
@@ -14,11 +22,18 @@ const Event = {
         LEFT JOIN Room room ON event.roomId = room.id
         LEFT JOIN Staff staff ON event.staffId = staff.id
         WHERE event.title ILIKE $1
-        ORDER BY ${sortColumn} ${sortOrder}
-        LIMIT $2 OFFSET $3
       `;
-      return await db.any(query, [`%${search}%`, limit, offset]);
-  },
+    
+      if (filters.staffId) {
+        params.push(filters.staffId);
+        query += ` AND event.staffId = $${params.length}`;
+      }
+      
+      query += ` ORDER BY ${actualSortColumn} ${actualSortOrder}
+        LIMIT $2 OFFSET $3`;
+    
+      return await db.any(query, params);
+    },
 
     // Get an event by ID
     getById: async (id) => {
@@ -50,59 +65,28 @@ const Event = {
       },
 
       // Add this to your existing Event model object
-count: async (searchQuery, filters = {}) => {
-  const params = [`%${searchQuery}%`];
-  
-  let query = `
-    SELECT COUNT(*) 
-    FROM Event event
-    LEFT JOIN Module module ON event.moduleId = module.id
-    LEFT JOIN Room room ON event.roomId = room.id
-    LEFT JOIN Staff staff ON event.staffId = staff.id
-    WHERE event.title ILIKE $1
-  `;
-
-  // Add filter conditions
-  let paramIndex = 2;
-  
-  if (filters.moduleId) {
-    query += ` AND event.moduleId = $${paramIndex}`;
-    params.push(filters.moduleId);
-    paramIndex++;
-  }
-  
-  if (filters.staffId) {
-    query += ` AND event.staffId = $${paramIndex}`;
-    params.push(filters.staffId);
-    paramIndex++;
-  }
-  
-  if (filters.roomId) {
-    query += ` AND event.roomId = $${paramIndex}`;
-    params.push(filters.roomId);
-    paramIndex++;
-  }
-  
-  if (filters.tag) {
-    query += ` AND event.tag = $${paramIndex}`;
-    params.push(filters.tag);
-    paramIndex++;
-  }
-  
-  if (filters.startDate) {
-    query += ` AND event.start_time >= $${paramIndex}`;
-    params.push(filters.startDate);
-    paramIndex++;
-  }
-  
-  if (filters.endDate) {
-    query += ` AND event.end_time <= $${paramIndex}`;
-    params.push(filters.endDate);
-    paramIndex++;
-  }
-
-  return await db.one(query, params);
-},
+      count: async (searchQuery, filters = {}) => {
+        const params = [`%${searchQuery}%`];
+        
+        let query = `
+          SELECT COUNT(*) 
+          FROM Event event
+          LEFT JOIN Module module ON event.moduleId = module.id
+          LEFT JOIN Room room ON event.roomId = room.id
+          LEFT JOIN Staff staff ON event.staffId = staff.id
+          WHERE event.title ILIKE $1
+        `;
+      
+        if (filters.staffId) {
+          const staffId = filters.staffId;
+          if (staffId) {
+            params.push(staffId);
+            query += ` AND event.staffId = $${params.length}`; // Changed from staff.id to event.staffId
+          }
+        }
+      
+        return await db.one(query, params);
+      },
 
     // Update an event
     update: async (id, updates) => {

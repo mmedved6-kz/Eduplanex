@@ -12,17 +12,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-// Update your Event type definition to include these properties
 type Event = {
   id: string | number;
   title: string;
   startTime: string;
   endTime: string;
-  // Add these properties
   startDate?: string;
   startTimeFormatted?: string;
   endTimeFormatted?: string;
-  // Other existing properties
   moduleName: string;
   roomName: string;
   staffName: string;
@@ -46,6 +43,11 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
+    header: "Type",
+    accessor: "tag", 
+    className: "hidden md:table-cell",
+  },
+  {
     header: "Room",
     accessor: "room",
     className: "hidden lg:table-cell",
@@ -59,11 +61,6 @@ const columns = [
     header: "Students",
     accessor: "students",
     className: "hidden lg:table-cell",
-  },
-  {
-    header: "Type",
-    accessor: "tag", 
-    className: "hidden md:table-cell",
   },
   {
     header: "Actions",
@@ -85,21 +82,21 @@ const EventListPage = () => {
   const [filters, setFilters] = useState<FilterOptions>({
     moduleId: null,
     staffId: null,
-    tag: null,
-    dateRange: null
   });
 
   useEffect(() => {
     const getEventData = async () => {
       try {
+        console.log("Fetching event data with filters:", filters);
         const data = await fetchEventData(currentPage, pageSize, searchQuery, sortColumn, sortOrder, filters);
+        console.log("Received events:", data.items);
         setEvents(data.items || []);
         setTotalPages(data.totalPages || 1);
       } catch (error) {
         setError("Failed to load event data. Please try again later.");
       }
     }
-
+  
     getEventData();
   }, [currentPage, searchQuery, sortColumn, sortOrder, filters]);
 
@@ -131,30 +128,6 @@ const EventListPage = () => {
     setSortColumn(column);
     setSortOrder(order);
     setCurrentPage(1);
-  };
-
-  const formatDate = (dateTimeString: string) => {
-    try {
-      const date = new Date(dateTimeString);
-      if (isNaN(date.getTime())) {
-        return "N/A";
-      }
-      return date.toLocaleDateString();
-    } catch (error) {
-      return "N/A";
-    }
-  };
-  
-  const formatTime = (dateTimeString: string) => {
-    try {
-      const date = new Date(dateTimeString);
-      if (isNaN(date.getTime())) {
-        return "N/A";
-      }
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch (error) {
-      return "N/A";
-    }
   };
 
   const renderEventCell = (item: Event) => (
@@ -213,8 +186,8 @@ const EventListPage = () => {
         <h1 className="hidden md:block text-lg font-semibold">All Events</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
           <TableSearch onSearch={handleSearch} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
+          <div className="flex items-center gap-4 self-end relative">
+            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]" onClick={toggleFilterPanel}>
               <Image src="/filter.png" alt="Filter" width={14} height={14} />
             </button>
               <FilterPanel
@@ -224,7 +197,7 @@ const EventListPage = () => {
                         currentFilters={filters}
                         entityType="event"
                         />
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
+            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]" onClick={toggleSortPanel}>
               <Image src="/sort.png" alt="Sort" width={14} height={14} />
             </button>
             <SortPanel 

@@ -4,37 +4,41 @@ const EventDto = require('../dto/eventDto');
 // Get all events
 const getAllEvents = async (req, res) => {
     try {
-        const {
-            page = 1,
-            pageSize = 10,
-            search = '',
-            sortColumn = 'event.name',
-            sortOrder = 'ASC',
-        } = req.query;
-
-        const filters = {
-
+      const {
+        page = 1,
+        pageSize = 10,
+        search = '', 
+        sortColumn = 'event.title', 
+        sortOrder = 'ASC',
+        staffId = null,
+      } = req.query;
+  
+      const filters = {
+        staffId: staffId || null,
         };
-
-        const limit = parseInt(pageSize);
-        const offset = (parseInt(page) - 1) * limit;
-
-        const events = await Event.getAll(limit, offset, search, sortColumn, sortOrder, filters);
-        const totalEvents = await Event.count(search, filters);
-        const totalPages = Math.ceil(totalEvents.count / limit);
-
-        const eventDtos = events.map(event => new EventDto(event));
-        res.json({
-            items: eventDtos,
-            currentPage: parseInt(page),
-            totalPages,
-            totalItems: totalEvents.count,
-            pageSize: limit,
-        });
+      
+      console.log('Event filters:', filters); // Debug log
+      
+      const limit = parseInt(pageSize);
+      const offset = (parseInt(page) - 1) * limit;
+  
+      const events = await Event.getAll(limit, offset, search, sortColumn, sortOrder, filters);
+      const totalEvents = await Event.count(search, filters);
+      const totalPages = Math.ceil(totalEvents.count / limit);
+  
+      const eventDtos = events.map(event => new EventDto(event));
+      res.json({
+        items: eventDtos,
+        currentPage: parseInt(page),
+        totalPages, 
+        totalItems: totalEvents.count,
+        pageSize: limit,
+      });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+      console.error('Error in getAllEvents:', error);
+      res.status(500).json({ error: error.message });
     }
-};
+  };
 
 // Get an event by ID
 const getEventById = async (req, res) => {
