@@ -2,9 +2,11 @@ import ClassCard from "@/app/components/ClassCard"
 import AssignmentCard from "@/app/components/AssingmentCard";
 import EventCalendar from "@/app/components/EventCalendar";
 import Announcements from "@/app/components/Announcements";
+import RequireAuth from "@/app/components/RequireAuth";
 
 const AdminPage = () => {
     return (
+        <RequireAuth allowedRoles={["admin"]}>
         <div className="p-4 flex gap-4 flex-col md:flex-row">
             {/* Left */}
             <div className="w-full lg:w-2/3">
@@ -25,6 +27,7 @@ const AdminPage = () => {
                 <Announcements />
             </div>
         </div>
+        </RequireAuth>
     );
 }
 

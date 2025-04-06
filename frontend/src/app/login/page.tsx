@@ -1,12 +1,10 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,11 +15,50 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+
+    try {
+        // For now, hardcoded values for quick development
+        // Replace this with actual API calls later
+        if (email === "admin@edu.com" && password === "password123") {
+          // Store user info
+          localStorage.setItem("user", JSON.stringify({
+            id: 1,
+            email: "admin@edu.com",
+            role: "admin"
+          }));
+          router.push("/dashboard/staff");
+        } else if (email === "staff@edu.com" && password === "password123") {
+          localStorage.setItem("user", JSON.stringify({
+            id: 2,
+            email: "staff@edu.com",
+            role: "staff"
+          }));
+          router.push("/dashboard/staff");
+        } else if (email === "student@edu.com" && password === "password123") {
+          localStorage.setItem("user", JSON.stringify({
+            id: 3,
+            email: "student@edu.com",
+            role: "student"
+          }));
+          router.push("/dashboard/student");
+        } else {
+          setError("Invalid email or password");
+        }
+      } catch (error) {
+        setError("An error occurred during login");
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+
+
+    /** 
     try {
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
@@ -35,19 +72,13 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       
-      // Redirect based on role
-      switch(data.user.role) {
-        case "admin":
-          router.push("/dashboard/admin");
-          break;
-        case "staff":
-          router.push("/dashboard/staff");
-          break;
-        case "student":
-          router.push("/dashboard/student");
-          break;
-        default:
-          router.push("/dashboard");
+      // Navigate based on role
+      if (data.user.role === "admin") {
+        router.push("/dashboard/staff");
+      } else if (data.user.role === "staff") {
+        router.push("/dashboard/staff");
+      } else {
+        router.push("/dashboard/student");
       }
     } catch (error: any) {
       setError(error.message);
@@ -55,6 +86,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+  */
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -76,9 +108,9 @@ export default function LoginPage() {
               Username
             </label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />

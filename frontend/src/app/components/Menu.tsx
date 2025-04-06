@@ -1,6 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { role } from "../lib/data";
+import { useEffect, useState } from "react";
+
+const handleLogout = () => {
+  localStorage.removeItem('user');
+};
 
 const menuItems = [
   {
@@ -62,7 +69,8 @@ const menuItems = [
       {
         icon: "/logout.png",
         label: "Logout",
-        href: "/logout",
+        onClick: handleLogout,
+        href: "/login",
         visible: ["admin", "staff", "student"],
       },
     ],
@@ -70,6 +78,20 @@ const menuItems = [
 ];
 
 const Menu = () => {
+  const [userRole, setUserRole] = useState("staff") // Default role, replace with actual role fetching logic
+
+  useEffect(() => {
+    const userJson = localStorage.getItem("user");
+    if (userJson) {
+      try {
+        const user = JSON.parse(userJson);
+        setUserRole(user.role);
+      } catch (error) {
+        console.error("Failed to parse user role:", error);
+      }
+    }
+  }, []);
+
   return (
     <div className="mt-4 text-sm">
       {menuItems.map((i) => (
@@ -78,7 +100,7 @@ const Menu = () => {
             {i.title}
           </span>
           {i.items.map((item) => {
-            if (item.visible.includes(role)) {
+            if (item.visible.includes(userRole)) {
               return (
                 <Link
                   href={item.href}
@@ -90,6 +112,7 @@ const Menu = () => {
                 </Link>
               );
             }
+            return null;
           })}
         </div>
       ))}

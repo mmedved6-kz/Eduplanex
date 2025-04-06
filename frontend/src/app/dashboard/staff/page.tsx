@@ -1,9 +1,11 @@
 import Announcements from "@/app/components/Announcements";
 import BigCalendar from "@/app/components/BigCalendar";
 import EventCalendar from "@/app/components/EventCalendar";
+import RequireAuth from "@/app/components/RequireAuth";
 
 const StaffPage = () => {
     return (
+        <RequireAuth allowedRoles={["admin", "staff"]}>
         <div className="flex-1 p-4 flex gap-4 flex-col xl:flex-row h-screen overflow-hidden">
             {/* LEFT SIDE */}
             <div className="w-full h-full flex flex-col">
@@ -17,6 +19,7 @@ const StaffPage = () => {
                 <Announcements />
             </div>
         </div>
+        </RequireAuth>
     );
 }
 
