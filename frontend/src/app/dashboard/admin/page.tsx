@@ -1,8 +1,9 @@
-import ClassCard from "@/app/components/ClassCard"
+import ClassCard from "@/app/components/AdminDashboardAnalytics"
 import AssignmentCard from "@/app/components/AssingmentCard";
 import EventCalendar from "@/app/components/EventCalendar";
 import Announcements from "@/app/components/Announcements";
 import RequireAuth from "@/app/components/RequireAuth";
+import DashboardStats from "@/app/components/AdminDashboardAnalytics";
 
 const AdminPage = () => {
     return (
@@ -12,7 +13,7 @@ const AdminPage = () => {
             <div className="w-full lg:w-2/3">
                 {/* Class Card */}
                 <div className="p-6 space-y-6">
-                <ClassCard title="CSC3064 Cloud Computing" description="Next Class"/>
+                <DashboardStats />
                 </div>
 
                 <div className="w-1/2 p-6 space-y-6">

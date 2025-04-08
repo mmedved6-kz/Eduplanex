@@ -4,6 +4,7 @@ import Image from "next/image";
 import { JSX, useCallback, useEffect, useState } from "react";
 
 import StaffForm from "./forms/StaffForm";
+import EventForm from "./forms/EventForm";
 
 type TableType = "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event";
 type FormType = "create" | "update" | "delete";
@@ -12,6 +13,7 @@ const forms:{
   [key:string]:(type:"create" | "update", data?:any, onClose?: () => void) => JSX.Element;
 } = {
   staff: (type, data, onClose) => <StaffForm type={type} data={data} onClose={onClose} />,
+  event: (type, data, onClose) => <EventForm type={type} data={data} onClose={onClose} />,
 };
 
 const FormModal = ({
@@ -19,11 +21,13 @@ const FormModal = ({
   type,
   data,
   id,
+  refreshData,
 }: {
   table: TableType;
   type: FormType;
   data?: any;
   id?: string | number;
+  refreshData?: () => void;
 }) => {
 
   const [open, setOpen] = useState(false);
@@ -66,8 +70,9 @@ const FormModal = ({
     setTimeout(() => {
       setOpen(false);
       setIsClosing(false);
+      if (refreshData) refreshData();
     }, 300);
-  }, []);
+  }, [refreshData]);
 
   const handleDelete = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

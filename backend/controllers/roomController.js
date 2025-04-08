@@ -10,10 +10,15 @@ const getAllRooms = async (req, res) => {
             search = '',
             sortColumn = 'room.name',
             sortOrder = 'ASC',
+            buildingId = null,
+            roomType = null,
+            minCapacity = null,
         } = req.query;
 
         const filters = {
-
+            buildingId: buildingId || null,
+            roomType: roomType || null,
+            minCapacity: minCapacity || null
         };
 
         const limit = parseInt(pageSize);
@@ -23,7 +28,7 @@ const getAllRooms = async (req, res) => {
         const totalRooms = await Room.count(search, filters);
         const totalPages = Math.ceil(totalRooms.count / limit);
 
-        const roomDtos = rooms.map(Room => new RoomDto(Room));
+        const roomDtos = rooms.map(room => new RoomDto(room));
         res.json({
             items: roomDtos,
             currentPage: parseInt(page),
@@ -32,11 +37,12 @@ const getAllRooms = async (req, res) => {
             pageSize: limit,
         });
     } catch (error) {
+        console.error('Error in getAllRooms:', error);
         res.status(500).json({ error: error.message });
     }
 };
 
-// Get an room by ID
+// Get a room by ID
 const getRoomById = async (req, res) => {
     try {
         const room = await Room.getById(req.params.id);
@@ -44,7 +50,7 @@ const getRoomById = async (req, res) => {
             const roomDto = new RoomDto(room);
             res.json(roomDto);
         } else {
-            res.status(404).json({ error: 'Event not found' });
+            res.status(404).json({ error: 'Room not found' });
         }
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -54,7 +60,26 @@ const getRoomById = async (req, res) => {
 // Create a new room
 const createRoom = async (req, res) => {
     try {
-        const newRoom = await Room.create(req.body);
+        const { name, room_type, capacity, buildingId, equipment } = req.body;
+        
+        // Generate a room ID if not provided
+        let id = req.body.id;
+        if (!id) {
+            // Generate a room ID based on building and type
+            const prefix = 'RM';
+            const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            id = `${prefix}${randomSuffix}`;
+        }
+        
+        const newRoom = await Room.create({
+            id,
+            name,
+            room_type,
+            capacity,
+            buildingId,
+            equipment: equipment || []
+        });
+        
         const roomDto = new RoomDto(newRoom);
         res.status(201).json(roomDto);
     } catch (error) {
@@ -62,10 +87,18 @@ const createRoom = async (req, res) => {
     }
 };
 
-// Update an room
+// Update a room
 const updateRoom = async (req, res) => {
     try {
-        const updatedRoom = await Room.update(req.params.id, req.body);
+        const { name, room_type, capacity, buildingId, equipment } = req.body;
+        const updatedRoom = await Room.update(req.params.id, {
+            name,
+            room_type,
+            capacity,
+            buildingId,
+            equipment: equipment || []
+        });
+        
         const roomDto = new RoomDto(updatedRoom);
         res.json(roomDto);
     } catch (error) {
@@ -73,7 +106,7 @@ const updateRoom = async (req, res) => {
     }
 };
 
-// Delete an room
+// Delete a room
 const deleteRoom = async (req, res) => {
     try {
         await Room.delete(req.params.id);

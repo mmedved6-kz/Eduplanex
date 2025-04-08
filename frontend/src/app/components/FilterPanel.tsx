@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { fetchDepartments, fetchCourses, fetchStaff } from '../lib/utils/fetch';
+import { useEffect, useState } from "react";
+import { fetchDepartments, fetchCourses, fetchStaff } from "../lib/utils/fetch";
 
-export type UserSex = 'MALE' | 'FEMALE';
+export type UserSex = "MALE" | "FEMALE";
 
 export interface FilterOptions {
   departmentId?: number | null;
@@ -19,10 +19,22 @@ interface FilterPanelProps {
   onClose: () => void;
   onApply: (filters: FilterOptions) => void;
   currentFilters: FilterOptions;
-  entityType: 'staff' | 'student' | 'course' | 'module' | 'department' | 'event';
+  entityType:
+    | "staff"
+    | "student"
+    | "course"
+    | "module"
+    | "department"
+    | "event";
 }
 
-const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: FilterPanelProps) => {
+const FilterPanel = ({
+  isOpen,
+  onClose,
+  onApply,
+  currentFilters,
+  entityType,
+}: FilterPanelProps) => {
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(
     currentFilters.departmentId || null
   );
@@ -49,46 +61,46 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
   useEffect(() => {
     if (isOpen) {
       // Fetch departments if needed
-      if (['staff', 'student', 'course'].includes(entityType)) {
+      if (["staff", "student", "course"].includes(entityType)) {
         fetchDepartments()
-          .then(data => {
+          .then((data) => {
             if (data?.items) {
               setDepartments(data.items);
             } else if (Array.isArray(data)) {
               setDepartments(data);
             }
           })
-          .catch(error => {
-            console.error('Failed to load departments:', error);
+          .catch((error) => {
+            console.error("Failed to load departments:", error);
           });
       }
 
       // Fetch courses if needed
-      if (['student', 'course', 'module'].includes(entityType)) {
+      if (["student", "course", "module"].includes(entityType)) {
         fetchCourses()
-          .then(data => {
+          .then((data) => {
             if (data?.items) {
               setCourses(data.items);
             } else if (Array.isArray(data)) {
               setCourses(data);
             }
           })
-          .catch(error => {
-            console.error('Failed to load courses:', error);
+          .catch((error) => {
+            console.error("Failed to load courses:", error);
           });
       }
 
-      if (['event'].includes(entityType)) {
+      if (["event"].includes(entityType)) {
         fetchStaff()
-          .then(data => {
+          .then((data) => {
             if (data?.items) {
               setStaff(data.items);
             } else if (Array.isArray(data)) {
               setStaff(data);
             }
           })
-          .catch(error => {
-            console.error('Failed to load staff:', error);
+          .catch((error) => {
+            console.error("Failed to load staff:", error);
           });
       }
     }
@@ -96,23 +108,23 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
 
   const handleApply = () => {
     const filters: FilterOptions = {};
-    
-    if (['staff', 'student', 'course'].includes(entityType)) {
+
+    if (["staff", "student", "course"].includes(entityType)) {
       filters.departmentId = selectedDepartment;
     }
-    
-    if (['student', 'course', 'module'].includes(entityType)) {
+
+    if (["student", "course", "module"].includes(entityType)) {
       filters.courseId = selectedCourse;
     }
-    
-    if (['staff', 'student'].includes(entityType)) {
+
+    if (["staff", "student"].includes(entityType)) {
       filters.sex = selectedGender;
     }
-    
-    if (['event'].includes(entityType)) {
+
+    if (["event"].includes(entityType)) {
       filters.staffId = selectedStaff;
     }
-    
+
     onApply(filters);
     onClose();
   };
@@ -121,7 +133,7 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
     setSelectedDepartment(null);
     setSelectedCourse(null);
     setSelectedGender(null);
-    setSelectedStaff(null); 
+    setSelectedStaff(null);
     setSelectedStartDate(null);
     setSelectedEndDate(null);
     onApply({});
@@ -133,18 +145,22 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
   return (
     <div className="absolute right-0 top-full mt-2 bg-white shadow-lg rounded-md p-4 border border-gray-200 z-50 w-64">
       <div className="space-y-4">
-        {['staff', 'student', 'course'].includes(entityType) && (
+        {["staff", "student", "course"].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Department
             </label>
             <select
-              value={selectedDepartment || ''}
-              onChange={(e) => setSelectedDepartment(e.target.value ? Number(e.target.value) : null)}
+              value={selectedDepartment || ""}
+              onChange={(e) =>
+                setSelectedDepartment(
+                  e.target.value ? Number(e.target.value) : null
+                )
+              }
               className="w-full rounded-md border border-gray-300 p-2 text-sm"
             >
               <option value="">All Departments</option>
-              {departments.map(dept => (
+              {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
@@ -152,19 +168,23 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
-        
-        {['student', 'course', 'module'].includes(entityType) && (
+
+        {["student", "course", "module"].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Course
             </label>
             <select
-              value={selectedCourse || ''}
-              onChange={(e) => setSelectedCourse(e.target.value ? Number(e.target.value) : null)}
+              value={selectedCourse || ""}
+              onChange={(e) =>
+                setSelectedCourse(
+                  e.target.value ? Number(e.target.value) : null
+                )
+              }
               className="w-full rounded-md border border-gray-300 p-2 text-sm"
             >
               <option value="">All Courses</option>
-              {courses.map(course => (
+              {courses.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.name}
                 </option>
@@ -172,15 +192,17 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
-        
-        {['staff', 'student'].includes(entityType) && (
+
+        {["staff", "student"].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Gender
             </label>
             <select
-              value={selectedGender || ''}
-              onChange={(e) => setSelectedGender(e.target.value as UserSex || null)}
+              value={selectedGender || ""}
+              onChange={(e) =>
+                setSelectedGender((e.target.value as UserSex) || null)
+              }
               className="w-full rounded-md border border-gray-300 p-2 text-sm"
             >
               <option value="">All</option>
@@ -189,27 +211,29 @@ const FilterPanel = ({ isOpen, onClose, onApply, currentFilters, entityType }: F
             </select>
           </div>
         )}
-        
-        {['event'].includes(entityType) && (
+
+        {["event"].includes(entityType) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Staff Member
             </label>
             <select
-  value={selectedStaff || ''}
-  onChange={(e) => setSelectedStaff(e.target.value || null)}
-  className="w-full rounded-md border border-gray-300 p-2 text-sm"
->
-  <option value="">All Staff</option> {/* This option is missing */}
-  {staff.map(staff => (
-    <option key={staff.id} value={staff.id}>
-      {staff.name}
-    </option>
-  ))}
-</select>
+              value={selectedStaff || ""}
+              onChange={(e) => setSelectedStaff(e.target.value || null)}
+              className="w-full rounded-md border border-gray-300 p-2 text-sm"
+            >
+              <option value="">All Staff</option> {/* This option is missing */}
+              {staff.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                </option>
+              ))}
+            </select>
           </div>
+          
+          
         )}
-        
+
         <div className="flex justify-between pt-2">
           <button
             onClick={handleReset}

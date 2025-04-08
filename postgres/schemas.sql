@@ -90,7 +90,7 @@ CREATE TABLE Event (
     moduleId VARCHAR(20),
     staffId VARCHAR(20),
     roomId VARCHAR(20),
-    capacity INT,
+    student_count INT,
     recurring BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT NOW(),
     FOREIGN KEY (moduleId) REFERENCES Module(id),

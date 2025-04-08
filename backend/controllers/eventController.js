@@ -58,6 +58,18 @@ const getEventById = async (req, res) => {
 // Create a new event
 const createEvent = async (req, res) => {
     try {
+        const eventData = {
+            title: req.body.title,
+            description: req.body.description,
+            start_time: new Date(req.body.start_time || req.body.start),
+            end_time: new Date(req.body.end_time || req.body.end),
+            moduleId: req.body.moduleId || req.body.module_id,
+            roomId: req.body.roomId || req.body.room_id,
+            staffId: req.body.staffId || req.body.staff_id,
+            student_count: req.body.student_count || req.body.student_count || 0,
+            tag: req.body.event_type || req.body.tag || 'CLASS'
+        };
+
         const newEvent = await Event.create(req.body);
         const eventDto = new EventDto(newEvent);
         res.status(201).json(eventDto);

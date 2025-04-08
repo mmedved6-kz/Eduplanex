@@ -43,7 +43,6 @@ const Event = {
                 m.name AS modulename,
                 r.name AS roomname,
                 s.name AS staffname,
-                r.capacity AS maxcapacity
             FROM Event e
             LEFT JOIN Module m ON e.moduleId = m.id
             LEFT JOIN Room r ON e.roomId = r.id
@@ -52,17 +51,16 @@ const Event = {
         `, [id]);
     },
 
-    // Create a new event
     create: async (event) => {
-        const { title, start, end, moduleId, roomId, staffId, studentCount } = event;
-        return await db.one(
-          `INSERT INTO Event 
-           (title, startTime, endTime, moduleId, roomId, staffId, studentCount) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7) 
-           RETURNING *`,
-          [title, start, end, moduleId, roomId, staffId, studentCount]
-        );
-      },
+      const { id, title, description, start_time, end_time, moduleId, roomId, staffId, student_count, tag } = event;
+      return await db.one(
+        `INSERT INTO Event 
+         (id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+         RETURNING *`,
+        [id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count]
+      );
+    },
 
       // Add this to your existing Event model object
       count: async (searchQuery, filters = {}) => {
@@ -90,7 +88,7 @@ const Event = {
 
     // Update an event
     update: async (id, updates) => {
-        const { title, start, end, moduleId, roomId, staffId, studentCount } = updates;
+        const { title, start, end, moduleId, roomId, staffId, student_count } = updates;
         return await db.one(
             `UPDATE Event SET 
                 title = $1,
@@ -99,10 +97,10 @@ const Event = {
                 moduleId = $4,
                 roomId = $5,
                 staffId = $6,
-                studentCount = $7
+                student_count = $7
              WHERE id = $8
              RETURNING *`,
-            [title, start, end, moduleId, roomId, staffId, studentCount, id]
+            [title, start, end, moduleId, roomId, staffId, student_count, id]
         );
     },
 

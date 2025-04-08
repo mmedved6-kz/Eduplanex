@@ -11,6 +11,7 @@ import { fetchEventData } from "@/app/lib/utils/fetch";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import AutoScheduleModal from "@/app/components/AutoscheduleModal";
 
 type Event = {
   id: string | number;
@@ -23,7 +24,7 @@ type Event = {
   moduleName: string;
   roomName: string;
   staffName: string;
-  studentCount: number;
+  student_count: number;
   tag: string;
 };
 
@@ -83,6 +84,7 @@ const EventListPage = () => {
     moduleId: null,
     staffId: null,
   });
+  const [isAutoScheduleModalOpen, setIsAutoScheduleModalOpen] = useState(false);
 
   useEffect(() => {
     const getEventData = async () => {
@@ -130,6 +132,21 @@ const EventListPage = () => {
     setCurrentPage(1);
   };
 
+  const refreshData = () => {
+    // Force re-fetch of event data
+    const getEventData = async () => {
+      try {
+        const data = await fetchEventData(currentPage, pageSize, searchQuery, sortColumn, sortOrder, filters);
+        setEvents(data.items || []);
+        setTotalPages(data.totalPages || 1);
+      } catch (error) {
+        setError("Failed to load event data. Please try again later.");
+      }
+    };
+    
+    getEventData();
+  };
+
   const renderEventCell = (item: Event) => (
     <div className="flex items-center gap-4 p-4">
       <div className="flex flex-col">
@@ -171,7 +188,7 @@ const EventListPage = () => {
       </td>
       <td className="hidden lg:table-cell">{item.roomName || "N/A"}</td>
       <td className="hidden lg:table-cell">{item.staffName || "Unassigned"}</td>
-      <td className="hidden lg:table-cell">{item.studentCount || 0}</td>
+      <td className="hidden lg:table-cell">{item.student_count || 0}</td>
       <td>{renderActionsCell(item)}</td>
     </tr>
   );
@@ -208,7 +225,19 @@ const EventListPage = () => {
                             currentOrder={sortOrder}
                             entityType="event"
                           />
-            <FormModal table="event" type="create" />
+            <div className="flex items-center gap-4 self-end relative">
+              <button 
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]"
+                onClick={() => setIsAutoScheduleModalOpen(true)}
+                >
+                  <Image src="/auto-schedule.png" alt="Auto-Schedule" width={14} height={14} />
+                </button>
+                <FormModal table="event" type="create" refreshData={refreshData}/>
+            </div>
+            <AutoScheduleModal
+              isOpen={isAutoScheduleModalOpen}
+              onClose={() => setIsAutoScheduleModalOpen(false)}
+              />
           </div>
         </div>
       </div>

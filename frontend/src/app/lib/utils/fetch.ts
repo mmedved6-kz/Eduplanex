@@ -175,18 +175,14 @@ export const fetchModules = async () => {
 
 export const fetchRooms = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/rooms');
+    const response = await fetch('http://localhost:5000/api/rooms?pageSize=100');
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Response status:', response.status);
-      console.error('Response text:', errorText);
-      throw new Error(`Failed to fetch rooms: ${response.status} ${errorText}`);
+      throw new Error('Failed to fetch rooms');
     }
-    const data = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error fetching rooms:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -311,11 +307,11 @@ export const fetchStaff = async () => {
   try {
     const response = await fetch('http://localhost:5000/api/staff?pageSize=100');
     if (!response.ok) {
-      throw new Error('Failed to fetch courses');
+      throw new Error('Failed to fetch staff');
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching courses:', error);
+    console.error('Error fetching staff:', error);
     return [];
   }
 };
