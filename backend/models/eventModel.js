@@ -159,8 +159,16 @@ const Event = {
 
     // Delete an event
     delete: async (id) => {
-        return await db.none('DELETE FROM Event WHERE id = $1', [id]);
-    },
+      return await db.tx(async t => {
+          console.log(`Deleting event ${id} and its related records`);
+          
+          // First, delete any student associations
+          await t.none('DELETE FROM event_students WHERE eventId = $1', [id]);
+          
+          // Then delete the event itself
+          return await t.none('DELETE FROM Event WHERE id = $1', [id]);
+      });
+  },
 };
 
 module.exports = Event;
