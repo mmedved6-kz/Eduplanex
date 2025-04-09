@@ -15,12 +15,14 @@ const Event = {
         SELECT 
           event.*,
           module.name AS modulename,
+          course.name AS coursename,
           room.name AS roomname,
           staff.name AS staffname
         FROM Event event
         LEFT JOIN Module module ON event.moduleId = module.id
         LEFT JOIN Room room ON event.roomId = room.id
         LEFT JOIN Staff staff ON event.staffId = staff.id
+        LEFT JOIN Course course ON event.courseId = course.id
         WHERE event.title ILIKE $1
       `;
     
@@ -43,23 +45,46 @@ const Event = {
                 m.name AS modulename,
                 r.name AS roomname,
                 s.name AS staffname,
+                c.name AS coursename
             FROM Event e
             LEFT JOIN Module m ON e.moduleId = m.id
             LEFT JOIN Room r ON e.roomId = r.id
             LEFT JOIN Staff s ON e.staffId = s.id
+            LEFT JOIN Course c ON e.courseId = c.id
             WHERE e.id = $1
         `, [id]);
     },
 
     create: async (event) => {
-      const { id, title, description, start_time, end_time, moduleId, roomId, staffId, student_count, tag } = event;
-      return await db.one(
-        `INSERT INTO Event 
-         (id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-         RETURNING *`,
-        [id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count]
-      );
+      const { 
+        id, title, description, start_time, end_time, 
+        moduleId, roomId, staffId, student_count, tag, courseId, students 
+      } = event;
+      
+      return await db.tx(async t => {
+        // Create event
+        const newEvent = await t.one(
+          `INSERT INTO Event 
+           (id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count, courseId) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+           RETURNING *`,
+          [id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count, courseId]
+        );
+        
+        // If we have students, create relationships
+        if (students && students.length > 0) {
+          console.log(`Creating ${students.length} student relationships for event ${id}`);
+          
+          // Use multi-row insert
+          const values = students.map(studentId => `('${id}', '${studentId}')`).join(', ');
+          await t.none(`
+            INSERT INTO event_students (eventId, studentId) 
+            VALUES ${values}
+          `);
+        }
+        
+        return newEvent;
+      });
     },
 
       // Add this to your existing Event model object
@@ -72,6 +97,7 @@ const Event = {
           LEFT JOIN Module module ON event.moduleId = module.id
           LEFT JOIN Room room ON event.roomId = room.id
           LEFT JOIN Staff staff ON event.staffId = staff.id
+          LEFT JOIN Course course ON event.courseId = course.id
           WHERE event.title ILIKE $1
         `;
       
@@ -79,7 +105,7 @@ const Event = {
           const staffId = filters.staffId;
           if (staffId) {
             params.push(staffId);
-            query += ` AND event.staffId = $${params.length}`; // Changed from staff.id to event.staffId
+            query += ` AND event.staffId = $${params.length}`;
           }
         }
       
@@ -88,20 +114,47 @@ const Event = {
 
     // Update an event
     update: async (id, updates) => {
-        const { title, start, end, moduleId, roomId, staffId, student_count } = updates;
-        return await db.one(
-            `UPDATE Event SET 
-                title = $1,
-                startTime = $2,
-                endTime = $3,
-                moduleId = $4,
-                roomId = $5,
-                staffId = $6,
-                student_count = $7
-             WHERE id = $8
-             RETURNING *`,
-            [title, start, end, moduleId, roomId, staffId, student_count, id]
+      const { 
+        title, description, start_time, end_time, 
+        moduleId, roomId, staffId, student_count, tag, courseId, students 
+      } = updates;
+      
+      return await db.tx(async t => {
+        // Update the event
+        const updatedEvent = await t.one(
+          `UPDATE Event SET 
+              title = $1,
+              description = $2,
+              start_time = $3,
+              end_time = $4,
+              moduleId = $5,
+              roomId = $6,
+              staffId = $7,
+              student_count = $8,
+              tag = $9,
+              courseId = $10
+           WHERE id = $11
+           RETURNING *`,
+          [title, description, start_time, end_time, moduleId, roomId, staffId, student_count, tag, courseId, id]
         );
+        
+        // Update student relationships - first remove all existing
+        await t.none('DELETE FROM event_students WHERE eventId = $1', [id]);
+        
+        // Then add the new ones if any
+        if (students && students.length > 0) {
+          console.log(`Creating ${students.length} student relationships for event ${id}`);
+          
+          // Use multi-row insert
+          const values = students.map(studentId => `('${id}', '${studentId}')`).join(', ');
+          await t.none(`
+            INSERT INTO event_students (eventId, studentId) 
+            VALUES ${values}
+          `);
+        }
+        
+        return updatedEvent;
+      });
     },
 
     // Delete an event

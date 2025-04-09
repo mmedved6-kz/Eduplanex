@@ -22,6 +22,8 @@ class EventDto {
         this.roomName = event.roomname || "N/A";
         this.staffId = event.staffid;
         this.staffName = event.staffname || "N/A";
+        this.courseId = event.courseid;
+        this.courseName = event.coursename || "N/A";
         this.student_count = event.student_count || 0;
     }
 }

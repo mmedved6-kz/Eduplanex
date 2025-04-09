@@ -13,6 +13,8 @@ router.get('/:id', eventController.getEventById);
 
 router.get('/calendar', eventController.getCalendarEvents);
 
+router.get('/:id/students', eventController.getEventStudents);
+
 // POST /api/courses
 router.post('/', eventController.createEvent);
 

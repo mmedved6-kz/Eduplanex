@@ -170,6 +170,65 @@ const EventForm = ({
     }
   });
 
+  useEffect(() => {
+    if (type === "update" && data) {
+      console.log("Setting form values for update mode:", data);
+      
+      // Set the id field
+      setValue("id", data.id);
+      
+      // Set basic event details
+      setValue("title", data.title || "");
+      setValue("description", data.description || "");
+      
+      // Format and set dates properly
+      if (data.startTime) {
+        setValue("start", formatDateTime(data.startTime));
+      }
+      if (data.endTime) {
+        setValue("end", formatDateTime(data.endTime));
+      }
+      
+      // Set resources
+      if (data.courseId) setValue("course_id", data.courseId);
+      if (data.moduleId) setValue("module_id", data.moduleId);
+      if (data.roomId) setValue("room_id", data.roomId);
+      if (data.staffId) setValue("staff_id", data.staffId);
+      
+      // Set event type
+      if (data.tag) setValue("event_type", data.tag);
+      
+      // Set student count and array
+      if (data.student_count !== undefined) {
+        setValue("student_count", data.student_count.toString());
+      }
+      
+      // If students are available as an array, set selected students
+      const fetchEventStudents = async () => {
+        try {
+          console.log(`Fetching students for event ID: ${data.id}`);
+          const response = await fetch(`http://localhost:5000/api/events/${data.id}/students`);
+          
+          if (response.ok) {
+            const studentData = await response.json();
+            console.log(`Retrieved ${studentData.length} students for event`);
+            // Set the selected students from the fetched data
+            setSelectedStudents(studentData.map((student: any) => student.id));
+          } else {
+            // Get error details
+            const errorText = await response.text();
+            console.error(`Failed to fetch students: ${response.status} ${response.statusText}`);
+            console.error(`Error details: ${errorText}`);
+          }
+        } catch (error) {
+          console.error("Error fetching event students:", error);
+        }
+      };
+      
+      fetchEventStudents();
+    }
+  }, [type, data, setValue]);
+
   const courseId = watch("course_id");
 
   // Filter modules based on selected course
@@ -213,13 +272,14 @@ const EventForm = ({
         description: formData.description || "",
         start_time: new Date(formData.start),
         end_time: new Date(formData.end),
+        courseId: formData.course_id,
         moduleId: formData.module_id || null,
         roomId: formData.room_id,
         staffId: formData.staff_id,
-        student_count: parseInt(formData.student_count.toString(), 10),
+        student_count: selectedStudents.length,
         tag: formData.event_type,
         recurring: false,
-        students: formData.students
+        students: selectedStudents
       };
 
       console.log("Submitting event data:", processedData);

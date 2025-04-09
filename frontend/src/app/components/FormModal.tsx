@@ -32,6 +32,7 @@ const FormModal = ({
 
   const [open, setOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const buttonConfig = {
     create: {
@@ -70,15 +71,38 @@ const FormModal = ({
     setTimeout(() => {
       setOpen(false);
       setIsClosing(false);
-      if (refreshData) refreshData();
+      if (refreshData) {
+          setTimeout(() => refreshData(), 300);
+      }
     }, 300);
   }, [refreshData]);
 
   const handleDelete = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(`Deleting ${table} with ID ${id}`);
-    handleClose();
-  }, [id, table, handleClose]);
+    setIsDeleting(true);
+
+    try {
+      console.log(`Deleting ${table} with ID: ${id}`);
+      const apiEndpoint = `http://localhost:5000/api/${table}s/${id}`;
+
+      const response = await fetch(apiEndpoint, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete ${table}`);
+      }
+
+      console.log(`Successfully deleted ${table} with ID: ${id}`);
+
+      if (refreshData) refreshData();
+      handleClose();
+    } catch (error) {
+      console.error(`Error deleting ${table}:`, error);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [id, table, handleClose, refreshData]);
 
   const renderForm = () => {
     if (type === "delete" && id !== undefined) {
@@ -91,13 +115,19 @@ const FormModal = ({
           type="submit"
           className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center"
         >
-          Delete
+          {isDeleting ? "Deleting..." : "Delete"}
         </button>
       </form>
       );
     };
 
     if ((type === "create" || type === "update") && forms[table]) {
+      console.log(`Rendering form for ${table} with data: `, data);
+
+      if (type === "update") {
+        return forms[table](type, data || {id}, handleClose);
+      }
+      
       return forms[table](type, data, handleClose);  
     }
 

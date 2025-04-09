@@ -164,11 +164,7 @@ const EventListPage = () => {
 
   const renderActionsCell = (item: Event) => (
     <div className="flex items-center gap-2">
-      <Link href={`/dashboard/list/event/${item.id}`}>
-        <button className="w-7 h-7 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
-          <Image src="/view.png" alt="View" width={14} height={14} />
-        </button>
-      </Link>
+      <FormModal table="event" type="update" id={item.id} data={item} refreshData={refreshData}/>
       <FormModal table="event" type="delete" id={item.id}/>
     </div>
   );
