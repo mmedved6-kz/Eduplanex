@@ -60,6 +60,9 @@ const Event = {
         id, title, description, start_time, end_time, 
         moduleId, roomId, staffId, student_count, tag, courseId, students 
       } = event;
+
+      const startDate = new Date(start_time);
+      const endDate = new Date(end_time);
       
       return await db.tx(async t => {
         // Create event
@@ -68,7 +71,7 @@ const Event = {
            (id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count, courseId) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
            RETURNING *`,
-          [id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count, courseId]
+          [id, title, description, startDate, endDate, tag, moduleId, roomId, staffId, student_count, courseId]
         );
         
         // If we have students, create relationships
@@ -119,6 +122,9 @@ const Event = {
         moduleId, roomId, staffId, student_count, tag, courseId, students 
       } = updates;
       
+      const startDate = new Date(start_time);
+      const endDate = new Date(end_time);
+
       return await db.tx(async t => {
         // Update the event
         const updatedEvent = await t.one(
@@ -135,7 +141,7 @@ const Event = {
               courseId = $10
            WHERE id = $11
            RETURNING *`,
-          [title, description, start_time, end_time, moduleId, roomId, staffId, student_count, tag, courseId, id]
+          [title, description, startDate, endDate, moduleId, roomId, staffId, student_count, tag, courseId, id]
         );
         
         // Update student relationships - first remove all existing

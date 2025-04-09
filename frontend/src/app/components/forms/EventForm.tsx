@@ -140,10 +140,23 @@ const EventForm = ({
   }, []);
 
   // Format date-time for default values
-  const formatDateTime = (dateTime: Date | string | undefined) => {
-    if (!dateTime) return '';
-    const date = new Date(dateTime);
-    return date.toISOString().slice(0, 16); // Format as "YYYY-MM-DDThh:mm"
+  const formatDateTime = (dateString: string | Date | undefined): string => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    
+    // Ensure valid date
+    if (isNaN(date.getTime())) return '';
+    
+    // Format to local date-time string in the format required by datetime-local input
+    // YYYY-MM-DDThh:mm
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const {
@@ -265,13 +278,16 @@ const EventForm = ({
       const url = type === "create" ? "http://localhost:5000/api/events" : `http://localhost:5000/api/events/${data?.id}`;
       const method = type === "create" ? "POST" : "PUT";
 
+      const startDate = new Date(formData.start);
+      const endDate = new Date(formData.end);
+
       // Convert dates to proper format and prepare data
       const processedData = {
         id: formData.id,  
         title: formData.title,
         description: formData.description || "",
-        start_time: new Date(formData.start),
-        end_time: new Date(formData.end),
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
         courseId: formData.course_id,
         moduleId: formData.module_id || null,
         roomId: formData.room_id,
