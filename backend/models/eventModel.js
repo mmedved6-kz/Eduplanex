@@ -168,13 +168,49 @@ const Event = {
       return await db.tx(async t => {
           console.log(`Deleting event ${id} and its related records`);
           
-          // First, delete any student associations
           await t.none('DELETE FROM event_students WHERE eventId = $1', [id]);
           
-          // Then delete the event itself
           return await t.none('DELETE FROM Event WHERE id = $1', [id]);
       });
   },
+
+  getCalendarEvents: async () => {
+    try {
+      const events = await db.any(`
+        SELECT 
+          e.*,
+          m.name AS modulename,
+          r.name AS roomname,
+          s.name AS staffname,
+          c.name AS coursename
+        FROM Event e
+        LEFT JOIN Module m ON e.moduleId = m.id
+        LEFT JOIN Room r ON e.roomId = r.id
+        LEFT JOIN Staff s ON e.staffId = s.id
+        LEFT JOIN Course c ON e.courseId = c.id
+        WHERE e.start_time >= CURRENT_DATE
+        ORDER BY e.start_time ASC
+        LIMIT 100
+      `);
+      
+      // Convert to standard format
+      return events.map(event => ({
+        id: event.id,
+        title: event.title,
+        startTime: event.start_time,
+        endTime: event.end_time,
+        description: event.description,
+        tag: event.tag,
+        moduleName: event.modulename,
+        roomName: event.roomname,
+        staffName: event.staffname,
+        courseName: event.coursename
+      }));
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      throw error;
+    }
+  }
 };
 
 module.exports = Event;

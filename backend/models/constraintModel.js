@@ -261,4 +261,48 @@ const Constraint = {
   }
 };
 
-module.exports = Constraint;
+const getViolations = async () => {
+  try {
+    // Query for hard violations
+    const hardViolations = await db.any(`
+      SELECT 
+        v.id, 
+        v.event_id AS "eventId", 
+        e.title AS "eventTitle", 
+        v.constraint_type AS "constraintType", 
+        'HARD' AS severity,
+        v.message, 
+        TO_CHAR(v.created_at, 'YYYY-MM-DD') AS date
+      FROM event_violations v
+      JOIN Event e ON v.event_id = e.id
+      ORDER BY v.created_at DESC
+      LIMIT 10
+    `);
+    
+    // Query for soft warnings
+    const softWarnings = await db.any(`
+      SELECT 
+        w.id, 
+        w.event_id AS "eventId", 
+        e.title AS "eventTitle", 
+        w.constraint_type AS "constraintType", 
+        'SOFT' AS severity,
+        w.message, 
+        TO_CHAR(w.created_at, 'YYYY-MM-DD') AS date
+      FROM event_warnings w
+      JOIN Event e ON w.event_id = e.id
+      ORDER BY w.created_at DESC
+      LIMIT 10
+    `);
+    
+    return [...hardViolations, ...softWarnings];
+  } catch (error) {
+    console.error('Error fetching violations from database:', error);
+    return [];
+  }
+};
+
+module.exports = {
+  Constraint,
+  getViolations,
+}

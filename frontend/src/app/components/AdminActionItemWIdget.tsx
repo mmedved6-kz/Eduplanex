@@ -16,66 +16,26 @@ type ActionItem = {
 const ActionItemsWidget = () => {
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'critical' | 'pending'>('all');
 
   useEffect(() => {
     const fetchActionItems = async () => {
       try {
         setLoading(true);
-        // In a real implementation, fetch from your API
-        // For demo, we'll use mock data
-        setTimeout(() => {
-          setActionItems([
-            {
-              id: 'act1',
-              title: 'Room B301 double-booked',
-              type: 'conflict',
-              entityId: 'EVT1234',
-              entityType: 'event',
-              priority: 'high',
-              createdAt: '2025-04-09',
-            },
-            {
-              id: 'act2',
-              title: 'Database Systems class needs staff assignment',
-              type: 'unassigned',
-              entityId: 'EVT2345',
-              entityType: 'event',
-              priority: 'high',
-              createdAt: '2025-04-08',
-            },
-            {
-              id: 'act3',
-              title: 'Room capacity insufficient for AI Workshop',
-              type: 'capacity',
-              entityId: 'EVT3456',
-              entityType: 'event',
-              priority: 'medium',
-              createdAt: '2025-04-07',
-            },
-            {
-              id: 'act4',
-              title: 'Student allocation pending for Mobile Dev course',
-              type: 'allocation',
-              entityId: 'CRS1001',
-              entityType: 'course',
-              priority: 'medium',
-              createdAt: '2025-04-06',
-            },
-            {
-              id: 'act5',
-              title: 'Resource approval pending for CS Workshop',
-              type: 'pending',
-              entityId: 'EVT4567',
-              entityType: 'event',
-              priority: 'low',
-              createdAt: '2025-04-05',
-            },
-          ]);
-          setLoading(false);
-        }, 800);
+        // Real API endpoint
+        const response = await fetch('http://localhost:5000/api/actions');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setActionItems(data.items || []);
       } catch (error) {
         console.error('Error fetching action items:', error);
+        setError('Failed to load action items');
+      } finally {
         setLoading(false);
       }
     };
@@ -94,6 +54,7 @@ const ActionItemsWidget = () => {
     switch (type) {
       case 'conflict':
         return (
+          // CHANGE SVG TO IMAGE ONCE UPLOAD NEW ICONS
           <div className="rounded-full bg-red-100 p-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

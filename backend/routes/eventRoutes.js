@@ -8,20 +8,21 @@ const authMiddleware = require('../middleware/authMiddleware');
 // GET /api/events
 router.get('/', eventController.getAllEvents);
 
-// GET /api/courses/:id
-router.get('/:id', eventController.getEventById);
-
 router.get('/calendar', eventController.getCalendarEvents);
 
+// GET /api/events/:id
+router.get('/:id', eventController.getEventById);
+
+// GET /api/events/:id/students
 router.get('/:id/students', eventController.getEventStudents);
 
-// POST /api/courses
+// POST /api/events
 router.post('/', eventController.createEvent);
 
-// PUT /api/courses/:id
+// PUT /api/events/:id
 router.put('/:id', eventController.updateEvent);
 
-// DELETE /api/courses/:id
+// DELETE /api/events/:id
 router.delete('/:id', eventController.deleteEvent);
 
 module.exports = router;

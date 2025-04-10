@@ -6,10 +6,11 @@ const courseRoutes = require('./routes/courseRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const constraintRoutes = require('./routes/constraintRoutes');
-const schedulerServiceRoutes = require('./routes/schedulerServiceRoutes'); // Add this line
+const schedulerServiceRoutes = require('./routes/schedulerServiceRoutes'); 
 const errorMiddleware = require('./middleware/errorMiddleware');
 const statsRoutes = require('./routes/statsRoutes');
-const roomRoutes = require('./routes/roomRoutes'); // Added room routes
+const roomRoutes = require('./routes/roomRoutes'); 
+const actionRoutes = require('./routes/actionRoutes');
 const cors = require('cors');
 const app = express();
 
@@ -26,7 +27,8 @@ app.use('/api/events', eventRoutes);
 app.use('/api/constraints', constraintRoutes);
 app.use('/api/scheduler', schedulerServiceRoutes); 
 app.use('/api/stats', statsRoutes); 
-app.use('/api/rooms', roomRoutes); // Added room routes
+app.use('/api/rooms', roomRoutes);
+app.use('/api/actions', actionRoutes); 
 
 // Error handling middleware
 app.use(errorMiddleware);

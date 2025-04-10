@@ -23,28 +23,17 @@ const ConstraintViolationsWidget = () => {
     const fetchViolations = async () => {
       try {
         setLoading(true);
-        // This would need an API endpoint to get current violations
         const response = await fetch('http://localhost:5000/api/constraints/violations');
+        
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
+        
         const data = await response.json();
         setViolations(data.violations || []);
       } catch (error) {
         console.error('Error fetching constraint violations:', error);
-        // For demo purposes, create sample data
-        setViolations([
-          {
-            id: "v1",
-            eventId: "EVT1001",
-            eventTitle: "Introduction to Computer Science",
-            constraintType: "room-conflict",
-            severity: "HARD",
-            message: "Room R101 is already booked during this time",
-            date: "2025-04-15"
-          },
-          // ... other sample violations
-        ]);
+        setError('Failed to load constraint data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -73,6 +62,7 @@ const ConstraintViolationsWidget = () => {
       <div className = "flex-grow flex items-center justify-center">
         <div className="text-center p-4">
           <div className="text-red-500 mb-2">
+            // CHANGE SVG TO NEW ICONS ONCE I UPLOAD
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

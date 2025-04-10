@@ -1,15 +1,11 @@
 const Constraint = require('../models/constraintModel');
 
-/**
- * Controller for handling constraint-related operations
- */
+
 const checkConstraints = async (req, res) => {
   try {
-    // Get the event to check
     const eventToCheck = req.body;
     console.log("Checking constraints for event:", eventToCheck);
     
-    // Validate the event data
     if (!eventToCheck.room_id && !eventToCheck.roomId) {
       return res.status(400).json({
         error: 'Room ID is required'
@@ -29,7 +25,7 @@ const checkConstraints = async (req, res) => {
       });
     }
     
-    // Map to the expected format
+    
     const event = {
       id: eventToCheck.id || null,
       roomId: eventToCheck.roomId || eventToCheck.room_id,
@@ -40,7 +36,6 @@ const checkConstraints = async (req, res) => {
       end: eventToCheck.end || eventToCheck.end_time
     };
     
-    // Run all constraint checks
     const result = await Constraint.validateEvent(event);
     
     return res.status(200).json({
@@ -58,7 +53,6 @@ const checkConstraints = async (req, res) => {
   }
 };
 
-// Get all available constraints
 const getConstraints = async (req, res) => {
   try {
     const constraints = [
@@ -106,50 +100,11 @@ const getConstraints = async (req, res) => {
 
 const getViolations = async (req, res) => {
   try {
-    // Since we don't have a table for violations yet, return mock data
-    const mockViolations = [
-      {
-        id: "v1",
-        eventId: "EVT1001",
-        eventTitle: "Introduction to Computer Science",
-        constraintType: "room-conflict",
-        severity: "HARD",
-        message: "Room R101 is already booked during this time",
-        date: "2025-04-15"
-      },
-      {
-        id: "v2",
-        eventId: "EVT1002",
-        eventTitle: "Advanced Database Systems",
-        constraintType: "staff-conflict",
-        severity: "HARD",
-        message: "Staff member is already teaching during this time",
-        date: "2025-04-16"
-      },
-      {
-        id: "v3",
-        eventId: "EVT1003",
-        eventTitle: "Web Development Workshop",
-        constraintType: "room-capacity",
-        severity: "HARD",
-        message: "Room capacity (30) is insufficient for class size (35)",
-        date: "2025-04-18"
-      },
-      {
-        id: "v4",
-        eventId: "EVT1004",
-        eventTitle: "Project Management",
-        constraintType: "staff-preferred-hours",
-        severity: "SOFT",
-        message: "Outside of staff preferred hours (8:00-16:00)",
-        date: "2025-04-17"
-      }
-    ];
-    
-    return res.status(200).json({ violations: mockViolations });
+    const violations = await Constraint.getViolations();
+    res.json({ violations });
   } catch (error) {
-    console.error('Error getting constraint violations:', error);
-    return res.status(500).json({ error: 'Failed to fetch constraint violations' });
+    console.error('Error in getViolations controller:', error);
+    res.status(500).json({ error: 'Failed to fetch violations' });
   }
 };
 
