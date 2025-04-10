@@ -1,6 +1,6 @@
 import Announcements from "@/app/components/Announcements";
+import AssignmentCard from "@/app/components/AssingmentCard";
 import BigCalendar from "@/app/components/BigCalendar";
-import EventCalendar from "@/app/components/EventCalendar";
 import RequireAuth from "@/app/components/RequireAuth";
 
 const StudentPage = () => {
@@ -16,8 +16,9 @@ const StudentPage = () => {
             </div>
             {/* RIGHT SIDE */} 
             <div className="w-full xl:w-1/3 flex flex-col gap-8">
-                <EventCalendar />
                 <Announcements />
+                <AssignmentCard />
+
             </div>
         </div>
         </RequireAuth>
