@@ -22,12 +22,9 @@ const Staff = {
         `;
 
         if (filters.departmentId) {
-            const departmentId = parseInt(filters.departmentId);
-            if (!isNaN(departmentId)) {
-              params.push(departmentId);
-              query += ` AND department.id = $${params.length}`;
-            }
-          }
+            params.push(filters.departmentId);
+            query += ` AND event.departmentId = $${params.length}`;
+        }
 
         if (filters.sex) {
             // Validate sex value against allowed enum values
@@ -56,30 +53,44 @@ const Staff = {
 
     // Create a new staff member
     create: async (staff) => {
-        const { username, name, surname, email, phone, address, img, sex, departmentId, birthday } = staff;
-        return await db.one(`
-            INSERT INTO Staff (username, name, surname, email, phone, address, img, sex, departmentId, birthday) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-            RETURNING *, (SELECT name FROM Department WHERE id = $9) as departmentName`,
-            [username, name, surname, email, phone, address, img, sex, departmentId, birthday]
+        const { username, name, surname, email, phone, img, sex, departmentId, position } = staff;
+        
+        return await db.tx(async t => {
+            const newStaff = await t.one(
+            `INSERT INTO Staff 
+            (username, name, surname, email, phone, img, sex, departmentId, position) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+            RETURNING *, (SELECT name FROM Department WHERE id = $8) as departmentName`,
+            [username, name, surname, email, phone, img, sex, departmentId, position]  
         );
+
+            return newStaff;
+        });
     },
 
     // Update a staff member
     update: async (id, updates) => {
-        const { name, email } = updates;
-        return await db.one(`
+        const { username, name, surname, email, phone, img, sex, departmentId, position } = updates;
+        return await db.tx(async t => {
+            const updatedEvent = await t.one(
+            `
             UPDATE Staff 
-            SET name = $1, email = $2 
-            WHERE id = $3 
+            SET username = $1, name = $2, surname = $3, email = $4, phone = $5, img = $6, sex = $7, departmentId = $8, position = $9
+            WHERE id = $10 
             RETURNING *, (SELECT name FROM Department WHERE id = Staff.departmentId) as departmentName`,
-            [name, email, id]
+            [username, name, surname, email, phone, img, sex, departmentId, position]
         );
+        return updatedEvent;
+    });
     },
 
     // Delete a staff member
     delete: async (id) => {
-        return await db.none('DELETE FROM Staff WHERE id = $1', [id]);
+        return await db.tx(async t => {
+            await t.one('DELETE FROM Staff WHERE id = $1', [id]);
+
+            return await t.none('DELETE FROM Staff WHERE id = $1', [id]);
+        });
     },
 
     count: async (searchQuery, filters) => {

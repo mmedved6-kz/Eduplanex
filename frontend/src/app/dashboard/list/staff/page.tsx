@@ -18,13 +18,9 @@ interface Staff {
   surname: string;
   email: string;
   phone: string;
-  address: string;
   img: string;
   sex: string;
-  createdAt: string;
-  updatedAt: string;
-  birthday: string;
-  departmentId: number;
+  position: string;
   departmentName: string;
 }
 
@@ -49,8 +45,8 @@ const columns = [
     className: "hidden lg:table-cell",
   },
   {
-    header: "Address",
-    accessor: "address",
+    header: "Position",
+    accessor: "position",
     className: "hidden lg:table-cell",
   },
   {
@@ -98,10 +94,9 @@ const StaffListPage = () => {
     setCurrentPage(1); 
   };
 
-  const handleSortApply = (column: string, order: string) => {
-    setSortColumn(column);
-    setSortOrder(order);
-    setCurrentPage(1); // Reset to first page when sorting changes
+  const toggleFilterPanel = () => {
+    setIsFilterPanelOpen(!isFilterPanelOpen);
+    if (isSortPanelOpen) setIsSortPanelOpen(false);
   };
 
   const handleFilterApply = (newFilters: FilterOptions) => {
@@ -109,18 +104,29 @@ const StaffListPage = () => {
     setCurrentPage(1);
   };
 
-  const toggleFilterPanel = () => {
-    setIsFilterPanelOpen(!isFilterPanelOpen);
-    if (isSortPanelOpen) setIsSortPanelOpen(false);
-  };
-
   const toggleSortPanel = () => {
     setIsSortPanelOpen(!isSortPanelOpen);
     if (isFilterPanelOpen) setIsFilterPanelOpen(false);
   };
 
-  if (error) {
-    return <div className="text-red-500">{error}</div>;
+  const handleSortApply = (column: string, order: string) => {
+    setSortColumn(column);
+    setSortOrder(order);
+    setCurrentPage(1); 
+  };
+
+  const refreshData = () => {
+    const getStaffData = async () => {
+      try {
+        const data = await fetchStaffData(currentPage, pageSize, searchQuery, sortColumn, sortOrder, filters);
+        setStaff(data.items || []);
+        setTotalPages(data.totalPages || 1);
+      } catch (error) {
+        setError("Failed to load staff data. Please try again later.");
+      }
+    };
+
+    getStaffData();
   }
 
   const renderInfoCell = (item: Staff) => (
@@ -148,7 +154,7 @@ const StaffListPage = () => {
           <Image src="/view.png" alt="" width={14} height={14} />
         </button>
       </Link>
-      <FormModal table="staff" type="delete" id={Number(item.id)} />
+      <FormModal table="staff" type="delete" id={item.id} />
     </div>
   );
 
@@ -161,10 +167,14 @@ const StaffListPage = () => {
       <td className="hidden md:table-cell">{item.id}</td>
       <td className="hidden md:table-cell">{item.departmentName || "N/A"}</td>
       <td className="hidden lg:table-cell">{item.phone}</td>
-      <td className="hidden lg:table-cell">{item.address}</td>
+      <td className="hidden lg:table-cell">{item.position || "Unassigned"}</td>
       <td>{renderActionsCell(item)}</td>
     </tr>
   );
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
 
   return (
     <div className="bg-white p-4 flex-1">

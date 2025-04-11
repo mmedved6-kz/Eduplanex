@@ -54,6 +54,19 @@ const getStaffById = async (req, res) => {
 
 const createStaff = async (req, res) => {
   try {
+    const staffData = {
+      id: req.body.id,
+      username: req.body.username,
+      name: req.body.name,
+      surname: req.body.surname,
+      email: req.body.email,
+      phone: req.body.phone,
+      sex: req.body.sex,
+      img: req.body.img,
+      position: req.body.position,
+      departmentId: req.body.departmentId,
+    };
+
     const newStaff = await Staff.create(req.body);
     const staffDto = new StaffDTO(newStaff);
     res.status(201).json(staffDto);
@@ -64,6 +77,18 @@ const createStaff = async (req, res) => {
 
 const updateStaff = async (req, res) => {
   try {
+    const staffData = {
+      id: req.body.id,
+      username: req.body.username,
+      name: req.body.name,
+      surname: req.body.surname,
+      email: req.body.email,
+      phone: req.body.phone,
+      sex: req.body.sex,
+      img: req.body.img,
+      position: req.body.position,
+      departmentId: req.body.departmentId,
+    }
     const updatedStaff = await Staff.update(req.params.id, req.body);
     const staffDto = new StaffDTO(updatedStaff);
     res.json(staffDto);
