@@ -5,6 +5,9 @@ import { JSX, useCallback, useEffect, useState } from "react";
 
 import StaffForm from "./forms/StaffForm";
 import EventForm from "./forms/EventForm";
+import CourseForm from "./forms/CourseForm";
+import StudentForm from "./forms/StudentForm";
+
 
 type TableType = "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event";
 type FormType = "create" | "update" | "delete";
@@ -14,6 +17,8 @@ const forms:{
 } = {
   staff: (type, data, onClose) => <StaffForm type={type} data={data} onClose={onClose} />,
   event: (type, data, onClose) => <EventForm type={type} data={data} onClose={onClose} />,
+  student: (type, data, onClose) => <StudentForm type={type} data={data} onClose={onClose} />,
+  course: (type, data, onClose) => <CourseForm type={type} data={data} onClose={onClose} />,
 };
 
 const FormModal = ({

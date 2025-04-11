@@ -55,7 +55,14 @@ const getCourseById = async (req, res) => {
 // Create a new course
 const createCourse = async (req, res) => {
     try {
-        const newCourse = await Course.create(req.body);
+        const courseData = {
+            id: req.body.id,
+            name: req.body.name,
+            description: req.body.description,
+            credits: req.body.credits,
+            departmentId: req.body.departmentId,
+        }
+        const newCourse = await Course.create(courseData);
         const courseDTO = new CourseDTO(newCourse);
         res.status(201).json(courseDTO);
     } catch (error) {
@@ -66,7 +73,14 @@ const createCourse = async (req, res) => {
 // Update a course
 const updateCourse = async (req, res) => {
     try {
-        const updatedCourse = await Course.update(req.params.id, req.body);
+        const courseData = {
+            id: req.body.id,
+            name: req.body.name,
+            description: req.body.description,
+            credits: req.body.credits,
+            departmentId: req.body.departmentId,
+        }
+        const updatedCourse = await Course.update(req.params.id, courseData);
         const courseDTO = new CourseDTO(updatedCourse);
         res.json(courseDTO);
     } catch (error) {

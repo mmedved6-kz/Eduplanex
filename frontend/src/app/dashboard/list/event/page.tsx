@@ -165,7 +165,7 @@ const EventListPage = () => {
   const renderActionsCell = (item: Event) => (
     <div className="flex items-center gap-2">
       <FormModal table="event" type="update" id={item.id} data={item} refreshData={refreshData}/>
-      <FormModal table="event" type="delete" id={item.id}/>
+      <FormModal table="event" type="delete" id={item.id} refreshData = {refreshData}/>
     </div>
   );
 

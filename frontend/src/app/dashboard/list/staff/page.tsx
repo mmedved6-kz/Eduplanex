@@ -154,7 +154,7 @@ const StaffListPage = () => {
           <Image src="/view.png" alt="" width={14} height={14} />
         </button>
       </Link>
-      <FormModal table="staff" type="delete" id={item.id} />
+      <FormModal table="staff" type="delete" id={item.id} refreshData={refreshData} />
     </div>
   );
 
@@ -210,7 +210,7 @@ const StaffListPage = () => {
                 entityType="staff"
               />
             </div>
-            <FormModal table="staff" type="create" />
+            <FormModal table="staff" type="create" refreshData={refreshData}/>
           </div>
         </div>
       </div>

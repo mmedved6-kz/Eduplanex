@@ -57,7 +57,18 @@ const getStudentById = async (req, res) => {
 // Create a new student
 const createStudent = async (req, res) => {
     try {
-        const newStudent = await Student.create(req.body);
+        const studentData = {
+            id: req.body.id,
+            username: req.body.username,
+            name: req.body.name,
+            surname: req.body.surname,
+            email: req.body.email,
+            phone: req.body.phone,
+            sex: req.body.sex,
+            img: req.body.img,
+            enrollment_date: req.body.enrollment_date,
+        }
+        const newStudent = await Student.create(studentData);
         const studentDTO = new StudentDTO(newStudent);
         res.status(201).json(studentDTO);
     } catch (error) {
@@ -68,7 +79,18 @@ const createStudent = async (req, res) => {
 // Update a student
 const updateStudent = async (req, res) => {
     try {
-        const updatedStudent = await Student.update(req.params.id, req.body);
+        const studentData = {
+            id: req.body.id,
+            username: req.body.username,
+            name: req.body.name,
+            surname: req.body.surname,
+            email: req.body.email,
+            phone: req.body.phone,
+            sex: req.body.sex,
+            img: req.body.img,
+            enrollment_date: req.body.enrollment_date,
+        }
+        const updatedStudent = await Student.update(req.params.id, studentData);
         const studentDTO = new StudentDTO(updatedStudent);
         res.json(studentDTO);
     } catch (error) {

@@ -225,39 +225,8 @@ class SchedulerOptimizer {
   }
 
   /**
-   * Find valid time slots for an event with specific room and staff
-   * @param {Object} event - The event to be scheduled
-   * @param {Object} room - The room to use
-   * @param {Object} staffMember - The staff member to assign
-   * @param {Array} timeSlots - Available time slots
-   * @param {Array} existingEvents - Already scheduled events
-   * @returns {Promise<Array>} Array of valid time slots with their constraint evaluations
-   */
-  static async findValidTimeSlots(event, room, staffMember, timeSlots, existingEvents) {
-    const validSlots = [];
-    
-    for (const slot of timeSlots) {
-      const validation = await this.validateCombination(
-        event, room, staffMember, slot, existingEvents
-      );
-      
-      if (validation.valid) {
-        validSlots.push({
-          timeSlot: slot,
-          softWarnings: validation.softWarnings,
-          // Calculate a score based on soft constraints
-          score: this.calculateSlotScore(slot, validation.softWarnings)
-        });
-      }
-    }
-    
-    // Sort by score (descending)
-    return validSlots.sort((a, b) => b.score - a.score);
-  }
-
-  /**
-   * Calculate a score for a time slot based on soft constraints
-   * @param {Object} timeSlot - The time slot
+   * Calculate slot score based on soft constraints
+   * @param {Object} timeSlot - Time slot to score
    * @param {Array} softWarnings - Soft constraint warnings
    * @returns {Number} Score for the time slot
    */
@@ -363,7 +332,7 @@ class SchedulerOptimizer {
     // Calculate staff workload balance
     const staffWorkloadBalance = this.calculateStaffWorkloadBalance(schedule);
     
-    // Calculate student experience (based on gaps, travel time between buildings, etc.)
+    // Calculate student experience
     const studentExperience = this.calculateStudentExperience(schedule, problem);
     
     return {
@@ -445,238 +414,23 @@ class SchedulerOptimizer {
    * @returns {Number} Student experience score (0-1, higher is better)
    */
   static calculateStudentExperience(schedule, problem) {
-    // For now, return a placeholder value
-    // In a real implementation, this would consider:
+    // Can include:
     // - Building transitions (minimizing travel time)
     // - Gap lengths (not too short, not too long)
-    // - Distribution throughout the week
+    // - Distribution of events throughout the week
     // - Back-to-back classes (some is good, too many is bad)
-    return 0.8;
+    return 0.8; // Default score for now
   }
 
   /**
-   * Generate a candidate solution using a constructive heuristic
-   * @param {Object} problem - The scheduling problem
-   * @returns {Array} A candidate schedule
-   */
-  static generateInitialSolution(problem) {
-    const { events, rooms, staff, existingEvents, timeSlots, preferences } = problem;
-    const schedule = [];
-    
-    // Sort events by priority (more constrained first)
-    const sortedEvents = [...events].sort((a, b) => {
-      // Student count - higher count is harder to place
-      const studentCountDiff = (b.student_count || 0) - (a.student_count || 0);
-      
-      // Specific room or staff preferences add constraints
-      const aConstraints = (a.preferredRoomIds?.length || 0) + (a.preferredStaffIds?.length || 0);
-      const bConstraints = (b.preferredRoomIds?.length || 0) + (b.preferredStaffIds?.length || 0);
-      
-      return studentCountDiff * 2 + (bConstraints - aConstraints);
-    });
-    
-    // Try to schedule each event
-    for (const event of sortedEvents) {
-      let bestSlot = null;
-      let bestRoom = null;
-      let bestStaff = null;
-      let bestScore = -Infinity;
-      
-      // Get eligible rooms (with sufficient capacity)
-      const eligibleRooms = rooms.filter(room => room.capacity >= (event.student_count || 0));
-      
-      // Prioritize preferred rooms if specified
-      const roomsToTry = event.preferredRoomIds && event.preferredRoomIds.length > 0
-        ? [...eligibleRooms.filter(r => event.preferredRoomIds.includes(r.id)), ...eligibleRooms]
-        : eligibleRooms;
-      
-      // Prioritize preferred staff if specified
-      const staffToTry = event.preferredStaffIds && event.preferredStaffIds.length > 0
-        ? [...staff.filter(s => event.preferredStaffIds.includes(s.id)), ...staff]
-        : staff;
-      
-      // Try each room-staff-timeslot combination
-      for (const room of roomsToTry) {
-        for (const staffMember of staffToTry) {
-          for (const slot of timeSlots) {
-            // Check if this combination is valid
-            const validation = this.validateCombination(
-              event, room, staffMember, slot, [...existingEvents, ...schedule]
-            );
-            
-            if (validation.valid) {
-              // Calculate score based on preferences
-              const slotScore = this.calculateSlotScore(slot, validation.softWarnings);
-              
-              // Add bonus for preferred room/staff
-              let bonus = 0;
-              if (event.preferredRoomIds && event.preferredRoomIds.includes(room.id)) {
-                bonus += 20;
-              }
-              if (event.preferredStaffIds && event.preferredStaffIds.includes(staffMember.id)) {
-                bonus += 20;
-              }
-              
-              const totalScore = slotScore + bonus;
-              
-              // Keep track of the best option
-              if (totalScore > bestScore) {
-                bestScore = totalScore;
-                bestSlot = slot;
-                bestRoom = room;
-                bestStaff = staffMember;
-              }
-            }
-          }
-        }
-      }
-      
-      // If we found a valid slot, add it to the schedule
-      if (bestSlot && bestRoom && bestStaff) {
-        schedule.push({
-          ...event,
-          roomId: bestRoom.id,
-          staffId: bestStaff.id,
-          start: bestSlot.start,
-          end: bestSlot.end,
-          softWarnings: [] // We'd get these from validateCombination in the actual implementation
-        });
-      }
-    }
-    
-    return schedule;
-  }
-
-  /**
-   * Generate a neighboring solution by making small changes
-   * @param {Array} solution - Current solution
-   * @param {Object} problem - The scheduling problem
-   * @returns {Array} A neighboring solution
-   */
-  static generateNeighbor(solution, problem) {
-    if (solution.length === 0) return [];
-    
-    const neighbor = [...solution];
-    
-    // Pick a random event to modify
-    const eventIndex = Math.floor(Math.random() * neighbor.length);
-    const event = { ...neighbor[eventIndex] };
-    
-    // Choose what to modify (room, staff, or time)
-    const changeType = Math.random();
-    
-    if (changeType < 0.33) {
-      // Change room
-      const eligibleRooms = problem.rooms.filter(r => r.capacity >= (event.student_count || 0));
-      if (eligibleRooms.length > 0) {
-        const newRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
-        event.roomId = newRoom.id;
-      }
-    } else if (changeType < 0.66) {
-      // Change staff
-      if (problem.staff.length > 0) {
-        const newStaff = problem.staff[Math.floor(Math.random() * problem.staff.length)];
-        event.staffId = newStaff.id;
-      }
-    } else {
-      // Change time
-      if (problem.timeSlots.length > 0) {
-        const newSlot = problem.timeSlots[Math.floor(Math.random() * problem.timeSlots.length)];
-        event.start = new Date(newSlot.start);
-        event.end = new Date(newSlot.end);
-      }
-    }
-    
-    // Update the solution
-    neighbor[eventIndex] = event;
-    
-    return neighbor;
-  }
-
-  /**
-   * Calculate acceptance probability for worse solutions in simulated annealing
-   * @param {Number} currentScore - Score of current solution
-   * @param {Number} newScore - Score of new solution
-   * @param {Number} temperature - Current temperature
-   * @returns {Number} Probability of accepting the new solution
-   */
-  static getAcceptanceProbability(currentScore, newScore, temperature) {
-    // If the new solution is better, always accept it
-    if (newScore > currentScore) {
-      return 1.0;
-    }
-    
-    // If the temperature is very low, reject worse solutions
-    if (temperature < 0.1) {
-      return 0.0;
-    }
-    
-    // Otherwise, calculate the acceptance probability
-    return Math.exp((newScore - currentScore) / temperature);
-  }
-
-  /**
-   * Implement simulated annealing to find an optimized schedule
-   * @param {Object} problem - The scheduling problem
-   * @returns {Object} Optimized schedule and evaluation
-   */
-  static simulatedAnnealing(problem, initialTemp = 100, coolingRate = 0.95, iterations = 1000) {
-    // Generate an initial solution
-    let currentSolution = this.generateInitialSolution(problem);
-    let currentEvaluation = this.evaluateSchedule(currentSolution, problem);
-    
-    // Keep track of the best solution found
-    let bestSolution = [...currentSolution];
-    let bestEvaluation = {...currentEvaluation};
-    
-    // Initialize temperature
-    let temperature = initialTemp;
-    
-    // Main simulated annealing loop
-    for (let i = 0; i < iterations; i++) {
-      // Generate a neighbor
-      const neighbor = this.generateNeighbor(currentSolution, problem);
-      
-      // Evaluate the neighbor
-      const neighborEval = this.evaluateSchedule(neighbor, problem);
-      
-      // Decide whether to accept the neighbor
-      const acceptanceProbability = this.getAcceptanceProbability(
-        currentEvaluation.score,
-        neighborEval.score,
-        temperature
-      );
-      
-      if (Math.random() < acceptanceProbability) {
-        currentSolution = neighbor;
-        currentEvaluation = neighborEval;
-        
-        // Update best solution if current is better
-        if (currentEvaluation.score > bestEvaluation.score) {
-          bestSolution = [...currentSolution];
-          bestEvaluation = {...currentEvaluation};
-        }
-      }
-      
-      // Cool down the temperature
-      temperature *= coolingRate;
-    }
-    
-    return {
-      schedule: bestSolution,
-      evaluation: bestEvaluation
-    };
-  }
-
-  /**
-   * Main optimization function for batch scheduling
+   * Main method for batch scheduling using genetic algorithm
    * @param {Array} eventsToSchedule - Events to be scheduled
    * @param {Object} preferences - Scheduling preferences
    * @returns {Promise<Object>} Optimized schedule and metrics
    */
-  static async optimizeBatchSchedule(eventsToSchedule, preferences) {
+  static async optimizeBatchScheduleGenetic(eventsToSchedule, preferences) {
     try {
-      console.log(`Starting batch optimization for ${eventsToSchedule.length} events`);
+      console.log(`Starting genetic algorithm optimization for ${eventsToSchedule.length} events`);
       
       // Fetch scheduling data
       const { rooms, staff, existingEvents } = await this.fetchSchedulingData();
@@ -689,6 +443,7 @@ class SchedulerOptimizer {
       // Convert day preferences to numbers
       const daysToSchedule = preferences.daysOfWeek.map(d => parseInt(d));
       
+      // Generate time slots
       const timeSlots = this.generateTimeSlots(
         startDate, 
         endDate, 
@@ -696,7 +451,7 @@ class SchedulerOptimizer {
         daysToSchedule
       );
       
-      // Create the scheduling problem
+      // Create the scheduling problem definition
       const problem = {
         events: eventsToSchedule,
         rooms,
@@ -706,42 +461,350 @@ class SchedulerOptimizer {
         preferences
       };
       
-      // Run simulated annealing
-      const result = this.simulatedAnnealing(problem);
+      // Run genetic algorithm
+      const result = await this.runGeneticAlgorithm(problem);
       
-      // Map schedule back to the format expected by the frontend
-      const scheduledEvents = result.schedule.map(event => ({
-        id: event.id || this.generateEventId(),
-        title: event.title,
-        start: event.start,
-        end: event.end,
-        roomId: event.roomId,
-        staffId: event.staffId,
-        moduleId: event.moduleId,
-        student_count: event.student_count,
-        tag: event.tag || 'CLASS',
-        students: event.students || []
+      // Map scheduled events to format expected by frontend
+      const scheduledEvents = result.bestChromosome.genes.map(gene => ({
+        id: gene.event.id || this.generateEventId(),
+        title: gene.event.title,
+        start: gene.timeSlot.start,
+        end: gene.timeSlot.end,
+        roomId: gene.room.id,
+        staffId: gene.staff.id,
+        moduleId: gene.event.moduleId,
+        student_count: gene.event.student_count,
+        tag: gene.event.tag || 'CLASS',
+        students: gene.event.students || []
       }));
       
-      // Return the results
+      // Identify events that couldn't be scheduled
+      const scheduledModuleIds = scheduledEvents.map(e => e.moduleId);
+      const unscheduledEvents = eventsToSchedule.filter(e => 
+        !scheduledModuleIds.includes(e.moduleId)
+      );
+      
+      // Return results
       return {
-        success: result.evaluation.hardViolations === 0,
+        success: result.metrics.hardViolations === 0,
         scheduledEvents,
-        unscheduledEvents: eventsToSchedule.filter(e => 
-          !scheduledEvents.some(se => se.moduleId === e.moduleId)
-        ),
+        unscheduledEvents,
         metrics: {
-          resourceUtilization: Math.round(result.evaluation.resourceUtilization * 100),
-          staffWorkloadBalance: Math.round(result.evaluation.staffWorkloadBalance * 100),
-          studentExperience: Math.round(result.evaluation.studentExperience * 100),
-          hardViolations: result.evaluation.hardViolations,
-          softViolations: result.evaluation.softViolations
+          resourceUtilization: Math.round(result.metrics.resourceUtilization * 100),
+          staffWorkloadBalance: Math.round(result.metrics.staffWorkloadBalance * 100),
+          studentExperience: Math.round(result.metrics.studentExperience * 100),
+          hardViolations: result.metrics.hardViolations,
+          softViolations: result.metrics.softViolations
         }
       };
     } catch (error) {
-      console.error('Error in batch optimization:', error);
+      console.error('Error in genetic algorithm optimization:', error);
       throw error;
     }
+  }
+
+  /**
+   * Implementation of the genetic algorithm
+   * @param {Object} problem - Scheduling problem definition
+   * @returns {Promise<Object>} Best chromosome and metrics
+   */
+  static async runGeneticAlgorithm(problem) {
+    // Algorithm parameters
+    const populationSize = 50;
+    const generations = 100;
+    const mutationRate = 0.1;
+    const crossoverRate = 0.8;
+    const eliteCount = 5; // Number of best chromosomes to keep unchanged
+    
+    console.log(`Running genetic algorithm with population ${populationSize}, generations ${generations}`);
+    
+    // Initialize population
+    let population = await this.initializePopulation(populationSize, problem);
+    let bestChromosome = null;
+    let bestFitness = -Infinity;
+    
+    // Evolution over generations
+    for (let gen = 0; gen < generations; gen++) {
+      // Evaluate fitness for all chromosomes
+      const fitnessScores = await Promise.all(
+        population.map(chromosome => this.evaluateFitness(chromosome, problem))
+      );
+      
+      // Find best chromosome in current generation
+      const bestIndex = fitnessScores.indexOf(Math.max(...fitnessScores));
+      if (fitnessScores[bestIndex] > bestFitness) {
+        bestFitness = fitnessScores[bestIndex];
+        bestChromosome = JSON.parse(JSON.stringify(population[bestIndex])); // Deep clone
+      }
+      
+      // Sort population by fitness for elitism
+      const sortedIndices = fitnessScores
+        .map((score, idx) => ({ score, idx }))
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.idx);
+        
+      const elites = sortedIndices.slice(0, eliteCount).map(idx => 
+        JSON.parse(JSON.stringify(population[idx]))
+      );
+      
+      // Selection - tournament selection
+      const selected = this.tournamentSelection(population, fitnessScores, populationSize);
+      
+      // Crossover
+      const offspring = [];
+      for (let i = 0; i < selected.length; i += 2) {
+        if (i + 1 < selected.length && Math.random() < crossoverRate) {
+          const [child1, child2] = this.crossover(selected[i], selected[i + 1]);
+          offspring.push(child1, child2);
+        } else {
+          offspring.push(selected[i]);
+          if (i + 1 < selected.length) {
+            offspring.push(selected[i + 1]);
+          }
+        }
+      }
+      
+      // Mutation
+      for (let i = 0; i < offspring.length; i++) {
+        if (Math.random() < mutationRate) {
+          offspring[i] = this.mutate(offspring[i], problem);
+        }
+      }
+      
+      // Elitism - keep best chromosomes
+      population = [...elites];
+      
+      // Fill the rest of the population from offspring
+      while (population.length < populationSize && offspring.length > 0) {
+        population.push(offspring.pop());
+      }
+      
+      // Progress log every 10 generations
+      if (gen % 10 === 0 || gen === generations - 1) {
+        console.log(`Generation ${gen + 1}/${generations}: Best fitness = ${bestFitness}`);
+      }
+    }
+    
+    // Evaluate final metrics for the best solution
+    const metrics = await this.evaluateSchedule(
+      bestChromosome.genes.map(gene => ({
+        ...gene.event,
+        roomId: gene.room.id,
+        staffId: gene.staff.id,
+        start: gene.timeSlot.start,
+        end: gene.timeSlot.end
+      })),
+      problem
+    );
+    
+    return {
+      bestChromosome,
+      metrics
+    };
+  }
+
+  /**
+   * Initialize population with random chromosomes
+   * @param {Number} size - Population size
+   * @param {Object} problem - Problem definition
+   * @returns {Promise<Array>} Initial population
+   */
+  static async initializePopulation(size, problem) {
+    const population = [];
+    
+    for (let i = 0; i < size; i++) {
+      // A chromosome is an array of genes, each representing an event assignment
+      const chromosome = { genes: [] };
+      
+      for (const event of problem.events) {
+        // For each event, randomly assign room, staff, and time slot
+        const eligibleRooms = problem.rooms.filter(r => r.capacity >= (event.student_count || 0));
+        
+        if (eligibleRooms.length === 0) continue; // Skip if no room has enough capacity
+        
+        const room = this.getRandomElement(eligibleRooms);
+        const staff = this.getRandomElement(problem.staff);
+        const timeSlot = this.getRandomElement(problem.timeSlots);
+        
+        // Skip if we couldn't find valid resources
+        if (!room || !staff || !timeSlot) continue;
+        
+        // Create a gene for this event
+        chromosome.genes.push({
+          event,
+          room,
+          staff,
+          timeSlot
+        });
+      }
+      
+      population.push(chromosome);
+    }
+    
+    return population;
+  }
+
+  /**
+   * Helper to get random element from array
+   * @param {Array} array - Array to select from
+   * @returns {*} Random element
+   */
+  static getRandomElement(array) {
+    if (!array || array.length === 0) return null;
+    return array[Math.floor(Math.random() * array.length)];
+  }
+
+  /**
+   * Evaluate fitness of a chromosome
+   * @param {Object} chromosome - Chromosome to evaluate
+   * @param {Object} problem - Problem definition
+   * @returns {Promise<Number>} Fitness score
+   */
+  static async evaluateFitness(chromosome, problem) {
+    // Convert chromosome to schedule format
+    const schedule = chromosome.genes.map(gene => ({
+      ...gene.event,
+      roomId: gene.room.id,
+      staffId: gene.staff.id,
+      start: gene.timeSlot.start,
+      end: gene.timeSlot.end
+    }));
+    
+    // Evaluate the schedule
+    const evaluation = await this.evaluateSchedule(schedule, problem);
+    
+    // Calculate fitness (higher is better)
+    const hardPenalty = evaluation.hardViolations * 1000; // Large penalty for hard violations
+    const softPenalty = evaluation.softViolations * 10;   // Smaller penalty for soft violations
+    
+    // Rewards for good utilization
+    const utilizationReward = evaluation.resourceUtilization * 100;
+    const balanceReward = evaluation.staffWorkloadBalance * 50;
+    const experienceReward = evaluation.studentExperience * 50;
+    
+    // Total fitness
+    return 1000 - hardPenalty - softPenalty + utilizationReward + balanceReward + experienceReward;
+  }
+
+  /**
+   * Tournament selection for genetic algorithm
+   * @param {Array} population - Current population
+   * @param {Array} fitnessScores - Fitness scores
+   * @param {Number} selectionSize - Number of chromosomes to select
+   * @returns {Array} Selected chromosomes
+   */
+  static tournamentSelection(population, fitnessScores, selectionSize) {
+    const selected = [];
+    const tournamentSize = 3;
+    
+    while (selected.length < selectionSize) {
+      // Select random individuals for tournament
+      const tournamentIndices = [];
+      for (let i = 0; i < tournamentSize; i++) {
+        tournamentIndices.push(Math.floor(Math.random() * population.length));
+      }
+      
+      // Find the best individual in the tournament
+      let bestIndex = tournamentIndices[0];
+      for (let i = 1; i < tournamentIndices.length; i++) {
+        if (fitnessScores[tournamentIndices[i]] > fitnessScores[bestIndex]) {
+          bestIndex = tournamentIndices[i];
+        }
+      }
+      
+      // Add winner to selected individuals
+      selected.push(JSON.parse(JSON.stringify(population[bestIndex]))); // Deep clone
+    }
+    
+    return selected;
+  }
+
+  /**
+   * Crossover operator for genetic algorithm
+   * @param {Object} parent1 - First parent chromosome
+   * @param {Object} parent2 - Second parent chromosome
+   * @returns {Array} Two child chromosomes
+   */
+  static crossover(parent1, parent2) {
+    // Create child chromosomes
+    const child1 = { genes: [] };
+    const child2 = { genes: [] };
+    
+    // Map events to make lookup easier
+    const eventMap1 = {};
+    const eventMap2 = {};
+    
+    parent1.genes.forEach(gene => {
+      eventMap1[gene.event.moduleId] = gene;
+    });
+    
+    parent2.genes.forEach(gene => {
+      eventMap2[gene.event.moduleId] = gene;
+    });
+    
+    // Get list of all moduleIds
+    const allModuleIds = [...new Set([
+      ...parent1.genes.map(g => g.event.moduleId),
+      ...parent2.genes.map(g => g.event.moduleId)
+    ])];
+    
+    // Select crossover point
+    const crossoverPoint = Math.floor(Math.random() * allModuleIds.length);
+    
+    // Create children
+    allModuleIds.forEach((moduleId, index) => {
+      if (index < crossoverPoint) {
+        if (eventMap1[moduleId]) child1.genes.push(JSON.parse(JSON.stringify(eventMap1[moduleId])));
+        if (eventMap2[moduleId]) child2.genes.push(JSON.parse(JSON.stringify(eventMap2[moduleId])));
+      } else {
+        if (eventMap2[moduleId]) child1.genes.push(JSON.parse(JSON.stringify(eventMap2[moduleId])));
+        if (eventMap1[moduleId]) child2.genes.push(JSON.parse(JSON.stringify(eventMap1[moduleId])));
+      }
+    });
+    
+    return [child1, child2];
+  }
+
+  /**
+   * Mutation operator for genetic algorithm
+   * @param {Object} chromosome - Chromosome to mutate
+   * @param {Object} problem - Problem definition
+   * @returns {Object} Mutated chromosome
+   */
+  static mutate(chromosome, problem) {
+    // Clone chromosome to avoid modifying original
+    const mutated = JSON.parse(JSON.stringify(chromosome));
+    
+    // Select a random gene
+    if (mutated.genes.length === 0) return mutated;
+    
+    const geneIndex = Math.floor(Math.random() * mutated.genes.length);
+    const gene = mutated.genes[geneIndex];
+    
+    // Decide what to mutate (room, staff, or time)
+    const mutationType = Math.random();
+    
+    if (mutationType < 0.33) {
+      // Mutate room
+      const eligibleRooms = problem.rooms.filter(
+        r => r.capacity >= (gene.event.student_count || 0)
+      );
+      if (eligibleRooms.length > 0) {
+        gene.room = this.getRandomElement(eligibleRooms);
+      }
+    } else if (mutationType < 0.66) {
+      // Mutate staff
+      if (problem.staff.length > 0) {
+        gene.staff = this.getRandomElement(problem.staff);
+      }
+    } else {
+      // Mutate time slot
+      if (problem.timeSlots.length > 0) {
+        gene.timeSlot = this.getRandomElement(problem.timeSlots);
+      }
+    }
+    
+    return mutated;
   }
 
   /**

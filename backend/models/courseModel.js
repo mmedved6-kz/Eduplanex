@@ -21,12 +21,9 @@ const Course = {
         `;
 
         if (filters.departmentId) {
-            const departmentId = filters.departmentId;
-            if (departmentId) {
-                params.push(departmentId);
-                query += ` AND course.departmentId = $${params.length}`;
-            }
-        }
+            params.push(filters.departmentId);
+            query += ` AND event.staffId = $${params.length}`;
+          }
           
         query += ` ORDER BY ${actualSortColumn} ${actualSortOrder}
                 LIMIT $2 OFFSET $3`;
@@ -48,14 +45,17 @@ const Course = {
 
     // Create a new course
     create: async (course) => {
-        const { name, description, credit_hours, departmentId } = course;
-        return await db.one(
+        const { id, name, description, credit_hours, departmentId } = course;
+        return await db.tx(async t => {
+            const newCourse = await t.one(
             `INSERT INTO Course 
-             (name, description, credit_hours, departmentId) 
-             VALUES ($1, $2, $3, $4) 
+             (id, name, description, credit_hours, departmentId) 
+             VALUES ($1, $2, $3, $4, $5) 
              RETURNING *`,
-            [name, description, credit_hours, departmentId]
+            [id, name, description, credit_hours, departmentId]
         );
+            return newCourse;
+        });
     },
 
     // Update a course

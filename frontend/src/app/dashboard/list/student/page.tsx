@@ -13,18 +13,13 @@ import { useEffect, useState } from "react";
 
 type Student = {
   id: number;
-  studentId: string;
   name: string;
   surname: string;
   email?: string;
-  photo: string;
+  img: string;
   phone?: string;
-  course: string;
-  modules: string[];
-  address: string;
   sex: string;
-  courseId: number;
-  courseName: string;
+  enrollmentDate: string;
 };
 
 const columns = [
@@ -38,8 +33,8 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
-    header: "Course",
-    accessor: "course",
+    header: "Email",
+    accessor: "email",
     className: "hidden md:table-cell",
   },
   {
@@ -48,8 +43,8 @@ const columns = [
     className: "hidden lg:table-cell",
   },
   {
-    header: "Address",
-    accessor: "address",
+    header: "Enrollment Date",
+    accessor: "enrollmentDate",
     className: "hidden lg:table-cell",
   },
   {
@@ -70,7 +65,6 @@ const StudentListPage = () => {
   const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
-    courseId: null,
     sex: null,
   });
 
@@ -97,10 +91,9 @@ const StudentListPage = () => {
     setCurrentPage(1); 
   };
 
-  const handleSortApply = (column: string, order: string) => {
-    setSortColumn(column);
-    setSortOrder(order);
-    setCurrentPage(1); 
+  const toggleFilterPanel = () => {
+    setIsFilterPanelOpen(!isFilterPanelOpen);
+    if (isSortPanelOpen) setIsSortPanelOpen(false);
   };
 
   const handleFilterApply = (newFilters: FilterOptions) => {
@@ -108,24 +101,34 @@ const StudentListPage = () => {
     setCurrentPage(1);
   };
 
-  const toggleFilterPanel = () => {
-    setIsFilterPanelOpen(!isFilterPanelOpen);
-    if (isSortPanelOpen) setIsSortPanelOpen(false);
-  };
-
   const toggleSortPanel = () => {
     setIsSortPanelOpen(!isSortPanelOpen);
     if (isFilterPanelOpen) setIsFilterPanelOpen(false);
   };
 
-  if (error) {
-    return <div className="text-red-500">{error}</div>;
-  }
+  const handleSortApply = (column: string, order: string) => {
+    setSortColumn(column);
+    setSortOrder(order);
+    setCurrentPage(1); 
+  };
+
+  const refreshData = () => {
+    const getStudentData = async () => {
+      try {
+        const data = await fetchStudentData(currentPage, pageSize, searchQuery, sortColumn, sortOrder, filters);
+        setStudent(data.items || []);
+        setTotalPages(data.totalPages || 1);
+      } catch (error) {
+        setError("Failed to load student data. Please try again later.");
+      }
+    }
+    getStudentData();
+  };
 
   const renderInfoCell = (item: Student) => (
     <div className="flex items-center gap-4 p-4">
         <Image
-          src={item.photo || "/avatar.png"}
+          src={item.img || "/avatar.png"}
           alt="Image"
           width={40}
           height={40}
@@ -147,7 +150,7 @@ const StudentListPage = () => {
               <Image src="/view.png" alt="" width={14} height={14} />
             </button>
           </Link>      
-          <FormModal table="student" type="delete" id={item.id}/>
+          <FormModal table="student" type="delete" id={item.id} refreshData={refreshData}/>
         </div>
   );
 
@@ -158,12 +161,16 @@ const StudentListPage = () => {
     >
       <td>{renderInfoCell(item)}</td>
       <td className="hidden md:table-cell">{item.id}</td>
-      <td className="hidden md:table-cell">{item.courseName || "N/A"}</td>
+      <td className="hidden md:table-cell">{item.email || "N/A"}</td>
       <td className="hidden lg:table-cell">{item.phone}</td>
-      <td className="hidden lg:table-cell">{item.address}</td>
+      <td className="hidden lg:table-cell">{item.enrollmentDate}</td>
       <td>{renderActionsCell(item)}</td>
     </tr>
   );
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
 
   return (
     <div className="bg-white p-4 flex-1">
@@ -199,7 +206,7 @@ const StudentListPage = () => {
                 entityType="student"
               />
             </div>
-              <FormModal table="student" type="create" />
+              <FormModal table="student" type="create" refreshData={refreshData}/>
           </div>
         </div>
       </div>

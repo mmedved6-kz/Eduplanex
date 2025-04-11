@@ -16,14 +16,6 @@ const Student = {
             FROM Student
             WHERE (name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1)
         `;
-
-        if (filters.courseId) {
-            const courseId = parseInt(filters.courseId);
-            if (!isNaN(courseId)) {
-              params.push(courseId);
-              query += ` AND course.id = $${params.length}`;
-            }
-          }
       
           if (filters.sex) {
             // Validate sex value against allowed enum values
@@ -50,23 +42,39 @@ const Student = {
 
     // Create a new student
     create: async (student) => {
-        const { username, name, surname, email, phone, address, img, sex, classId, courseId, moduleId, birthday } = student;
-        return await db.one(
+        const { id, username, name, surname, email, phone, img, sex, enrollment_date} = student;
+        return await db.tx(async t => {
+          const newStudent = await t.one(
             `INSERT INTO Student 
-             (username, name, surname, email, phone, address, img, sex, birthday) 
+             (id, username, name, surname, email, phone, img, sex, enrollment_date) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
              RETURNING *`,
-            [username, name, surname, email, phone, address, img, sex, classId, courseId, moduleId, birthday]
+            [id, username, name, surname, email, phone, img, sex, enrollment_date]
         );
+            return newStudent;
+        });
     },
 
     // Update a student
     update: async (id, updates) => {
-        const { name, email } = updates;
-        return await db.one(
-            'UPDATE Student SET name = $1, email = $2, phone = $3 WHERE id = $4 RETURNING *',
-            [name, email, id]
-        );
+        const { username, name, surname, email, phone, img, sex, enrollment_date } = updates;
+        return await db.tx(async t => {
+          const updatedStudent = await t.one(
+            `UPDATE Student
+             SET username = $1,
+              name = $2,
+              surname = $3,
+              email = $4,
+              phone = $5
+              img = $6,
+              sex = $7,
+              enrollment_date = $8
+              WHERE id = $9 
+              RETURNING *`,
+            [username, name, surname, email, phone, img, sex, enrollment_date, id]
+          );
+            return updatedStudent;
+      });
     },
 
     // Delete a student

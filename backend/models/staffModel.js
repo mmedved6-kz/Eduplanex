@@ -53,15 +53,15 @@ const Staff = {
 
     // Create a new staff member
     create: async (staff) => {
-        const { username, name, surname, email, phone, img, sex, departmentId, position } = staff;
+        const { id, username, name, surname, email, phone, img, sex, departmentId, position } = staff;
         
         return await db.tx(async t => {
             const newStaff = await t.one(
             `INSERT INTO Staff 
-            (username, name, surname, email, phone, img, sex, departmentId, position) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
-            RETURNING *, (SELECT name FROM Department WHERE id = $8) as departmentName`,
-            [username, name, surname, email, phone, img, sex, departmentId, position]  
+            (id, username, name, surname, email, phone, img, sex, departmentId, position) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+            RETURNING *, (SELECT name FROM Department WHERE id = $9) as departmentName`,
+            [id, username, name, surname, email, phone, img, sex, departmentId, position]  
         );
 
             return newStaff;
@@ -78,7 +78,7 @@ const Staff = {
             SET username = $1, name = $2, surname = $3, email = $4, phone = $5, img = $6, sex = $7, departmentId = $8, position = $9
             WHERE id = $10 
             RETURNING *, (SELECT name FROM Department WHERE id = Staff.departmentId) as departmentName`,
-            [username, name, surname, email, phone, img, sex, departmentId, position]
+            [username, name, surname, email, phone, img, sex, departmentId, position, id]
         );
         return updatedEvent;
     });

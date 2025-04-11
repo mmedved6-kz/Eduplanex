@@ -67,7 +67,7 @@ const createStaff = async (req, res) => {
       departmentId: req.body.departmentId,
     };
 
-    const newStaff = await Staff.create(req.body);
+    const newStaff = await Staff.create(staffData);
     const staffDto = new StaffDTO(newStaff);
     res.status(201).json(staffDto);
   } catch (error) {
@@ -89,7 +89,7 @@ const updateStaff = async (req, res) => {
       position: req.body.position,
       departmentId: req.body.departmentId,
     }
-    const updatedStaff = await Staff.update(req.params.id, req.body);
+    const updatedStaff = await Staff.update(req.params.id, staffData);
     const staffDto = new StaffDTO(updatedStaff);
     res.json(staffDto);
   } catch (error) {
