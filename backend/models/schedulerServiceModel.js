@@ -11,7 +11,7 @@ const SchedulerService = {
   /**
    * Get available rooms for a given time slot and capacity
    */
-  getAvailableRooms: async (startTime, endTime, requiredCapacity) => {
+  getAvailableRooms: async (start_time, end_time, requiredCapacity) => {
     try {
       // Get all rooms with sufficient capacity
       const rooms = await Room.getAll();
@@ -22,8 +22,8 @@ const SchedulerService = {
       for (const room of suitableRooms) {
         const availability = await Constraint.checkRoomAvailability(
           room.id, 
-          startTime, 
-          endTime
+          start_time, 
+          end_time
         );
         
         if (availability.available) {
@@ -41,7 +41,7 @@ const SchedulerService = {
   /**
    * Get available staff for a given time slot
    */
-  getAvailableStaff: async (startTime, endTime, departmentId = null) => {
+  getAvailableStaff: async (start_time, end_time, departmentId = null) => {
     try {
       // Get all staff or filter by department
       const query = departmentId ? { departmentId } : {};
@@ -52,8 +52,8 @@ const SchedulerService = {
       for (const member of staff) {
         const availability = await Constraint.checkStaffAvailability(
           member.id, 
-          startTime, 
-          endTime
+          start_time, 
+          end_time
         );
         
         if (availability.available) {
@@ -247,8 +247,8 @@ const SchedulerService = {
       // Create the event
       const newEvent = await Event.create({
         title,
-        startTime: start,
-        endTime: end,
+        start_time: start,
+        end_time: end,
         roomId: selectedRoom.id,
         staffId: selectedStaff.id,
         moduleId,

@@ -175,10 +175,12 @@ class SchedulerOptimizer {
     }
     
     // 3. Check for back-to-back classes (if staff has other classes that day)
-    const sameDayEvents = existingEvents.filter(e => 
-      e.staffId === staffMember.id &&
-      e.start.toDateString() === timeSlot.start.toDateString()
-    );
+    const sameDayEvents = existingEvents.filter(e => {
+      // Ensure e.start is a Date object
+      const eStart = e.start instanceof Date ? e.start : new Date(e.start);
+      return e.staffId === staffMember.id &&
+             eStart.toDateString() === timeSlot.start.toDateString();
+    });
     
     // Look for events with good gaps (15-30 min) or inefficient gaps (30 min - 2 hours)
     let hasOptimalGap = false;
@@ -293,8 +295,11 @@ class SchedulerOptimizer {
     // Check room and staff conflicts
     schedule.forEach(event => {
       // Create unique identifiers for the time slots
-      const day = event.start.toDateString();
-      const timeRange = `${event.start.toTimeString()}-${event.end.toTimeString()}`;
+      const start = event.start instanceof Date ? event.start : new Date(event.start);
+      const end = event.end instanceof Date ? event.end : new Date(event.end);
+  
+      const day = start.toDateString();
+      const timeRange = `${start.toTimeString().slice(0,8)}-${end.toTimeString().slice(0,8)}`;
       const timeSlot = `${day}:${timeRange}`;
       
       // Check room conflicts
@@ -364,7 +369,11 @@ class SchedulerOptimizer {
     
     // Calculate scheduled room-hours
     const scheduledRoomHours = schedule.reduce((sum, event) => {
-      const hours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+      // Ensure event.start and event.end are Date objects
+      const start = event.start instanceof Date ? event.start : new Date(event.start);
+      const end = event.end instanceof Date ? event.end : new Date(event.end);
+      
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       return sum + hours;
     }, 0);
     
@@ -385,7 +394,11 @@ class SchedulerOptimizer {
         staffWorkloads[event.staffId] = 0;
       }
       
-      const hours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+      // Ensure event.start and event.end are Date objects
+      const start = event.start instanceof Date ? event.start : new Date(event.start);
+      const end = event.end instanceof Date ? event.end : new Date(event.end);
+      
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       staffWorkloads[event.staffId] += hours;
     });
     
@@ -432,6 +445,11 @@ class SchedulerOptimizer {
     try {
       console.log(`Starting genetic algorithm optimization for ${eventsToSchedule.length} events`);
       
+      const cleanEvents = eventsToSchedule.map(event => {
+        const { start, end, ...cleanEvent } = event;
+          return cleanEvent;
+      });
+
       // Fetch scheduling data
       const { rooms, staff, existingEvents } = await this.fetchSchedulingData();
       
@@ -453,7 +471,7 @@ class SchedulerOptimizer {
       
       // Create the scheduling problem definition
       const problem = {
-        events: eventsToSchedule,
+        events: cleanEvents,
         rooms,
         staff,
         existingEvents,
@@ -480,7 +498,7 @@ class SchedulerOptimizer {
       
       // Identify events that couldn't be scheduled
       const scheduledModuleIds = scheduledEvents.map(e => e.moduleId);
-      const unscheduledEvents = eventsToSchedule.filter(e => 
+      const unscheduledEvents = cleanEvents.filter(e => 
         !scheduledModuleIds.includes(e.moduleId)
       );
       
@@ -662,13 +680,21 @@ class SchedulerOptimizer {
    */
   static async evaluateFitness(chromosome, problem) {
     // Convert chromosome to schedule format
-    const schedule = chromosome.genes.map(gene => ({
-      ...gene.event,
-      roomId: gene.room.id,
-      staffId: gene.staff.id,
-      start: gene.timeSlot.start,
-      end: gene.timeSlot.end
-    }));
+    const schedule = chromosome.genes.map(gene => {
+      // Ensure timeSlot.start and timeSlot.end are Date objects
+      const start = gene.timeSlot.start instanceof Date ? 
+        gene.timeSlot.start : new Date(gene.timeSlot.start);
+      const end = gene.timeSlot.end instanceof Date ? 
+        gene.timeSlot.end : new Date(gene.timeSlot.end);
+    
+      return {
+        ...gene.event,
+        roomId: gene.room.id,
+        staffId: gene.staff.id,
+        start,
+        end
+      };
+    });
     
     // Evaluate the schedule
     const evaluation = await this.evaluateSchedule(schedule, problem);

@@ -126,6 +126,7 @@ const backtrackScheduleEvent = async (eventData) => {
       
       // Create the event
       const newEvent = await Event.create({
+        id: SchedulerOptimizer.generateEventId(),
         title: eventData.title,
         description: eventData.description || '',
         start_time: timeSlot.start,

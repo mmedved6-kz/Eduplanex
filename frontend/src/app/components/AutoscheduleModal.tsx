@@ -18,6 +18,14 @@ interface EventToSchedule {
   roomId?: string;
 }
 
+interface SchedulingMetrics {
+  resourceUtilization: number;
+  staffWorkloadBalance: number;
+  studentExperience: number;
+  hardViolations: number;
+  softViolations: number;
+}
+
 const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
   const [events, setEvents] = useState<EventToSchedule[]>([]);
   const [modules, setModules] = useState<any[]>([]);
@@ -31,6 +39,8 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<{[key: number]: string[]}>({});
   const [studentSearch, setStudentSearch] = useState('');
+  const [optimizationMetrics, setOptimizationMetrics] = useState<SchedulingMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Scheduling preferences
   const [preferences, setPreferences] = useState({
@@ -38,6 +48,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
     daysOfWeek: ['1', '2', '3', '4', '5'], // Monday to Friday
     maxEventsPerDay: 3,
     gapBetweenEvents: 15, // minutes
+    optimizationFocus: 'balanced', // 'balanced', 'resource', 'staff', 'student'
   });
 
   useEffect(() => {
@@ -46,6 +57,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
       setEvents([]);
       setResults(null);
       setStep('configure');
+      setOptimizationMetrics(null);
       fetchData();
     }
   }, [isOpen]);
@@ -198,26 +210,41 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
       // Prepare events with preferences
       const eventsToSchedule = events.map(event => ({
         ...event,
-        preferences: {
-          timeOfDay: preferences.timeRange,
-          daysOfWeek: preferences.daysOfWeek.map(Number),
-          gapBetweenEvents: preferences.gapBetweenEvents
-        }
+        preferredRoomIds: event.roomId ? [event.roomId] : [],
+        preferredStaffIds: event.staffId ? [event.staffId] : []
       }));
       
-      const response = await fetch('/api/scheduler/batch', {
+      const response = await fetch('http://localhost:5000/api/scheduler/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           events: eventsToSchedule,
-          maxEventsPerDay: preferences.maxEventsPerDay
+          preferences: {
+            ...preferences,
+            optimizationFocus: preferences.optimizationFocus
+          }
         })
       });
       
-      if (!response.ok) throw new Error('Scheduling failed');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Scheduling failed: ${response.status} ${errorText}`);
+      }
       
       const data = await response.json();
+      console.log('Scheduling results:', data);
+      
       setResults(data);
+
+      const metrics = data.metrics || {
+        resourceUtilization: 0,
+        staffWorkloadBalance: 0,
+        studentExperience: 0,
+        hardViolations: 0,
+        softViolations: 0
+      };
+
+      setOptimizationMetrics(metrics);
       setStep('results');
     } catch (error) {
       console.error('Auto-scheduling error:', error);
@@ -244,6 +271,49 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
       minute: '2-digit'
     });
   };
+  
+  // Render optimization metrics
+  const renderMetrics = () => {
+    if (!optimizationMetrics) return null;
+    
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
+        <h3 className="text-lg font-medium text-gray-800 mb-3">Optimization Metrics</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+              <span className="text-xl font-bold text-blue-600">{optimizationMetrics.resourceUtilization}%</span>
+            </div>
+            <p className="text-sm text-gray-600">Resource Utilization</p>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
+              <span className="text-xl font-bold text-green-600">{optimizationMetrics.staffWorkloadBalance}%</span>
+            </div>
+            <p className="text-sm text-gray-600">Staff Balance</p>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+              <span className="text-xl font-bold text-purple-600">{optimizationMetrics.studentExperience}%</span>
+            </div>
+            <p className="text-sm text-gray-600">Student Experience</p>
+          </div>
+        </div>
+        
+        <div className="mt-4 flex justify-between text-sm">
+          <p className="text-gray-600">Hard Constraints: <span className={optimizationMetrics.hardViolations > 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
+            {optimizationMetrics.hardViolations === 0 ? "All Satisfied" : `${optimizationMetrics.hardViolations} Violations`}
+          </span></p>
+          
+          <p className="text-gray-600">Soft Constraints: <span className="text-amber-600 font-medium">
+            {optimizationMetrics.softViolations} Warnings
+          </span></p>
+        </div>
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -259,6 +329,12 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
             <Image src="/close.png" alt="Close" width={16} height={16} />
           </button>
         </div>
+        
+        {error && (
+          <div className='bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4'>
+            {error}
+          </div>
+        )}
         
         {/* Progress indicator */}
         <div className="flex items-center mb-8 relative">
@@ -490,6 +566,21 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                     <option value="60">1 hour</option>
                   </select>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Optimization Focus</label>
+                  <select
+                    value={preferences.optimizationFocus}
+                    onChange={(e) => handlePreferenceChange('optimizationFocus', e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  >
+                    <option value="balanced">Balanced</option>
+                    <option value="resource">Resource Utilization</option>
+                    <option value="staff">Staff Workload Balance</option>
+                    <option value="student">Student Experience</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">What aspect to prioritize in optimization</p>
+                </div>
               </div>
             </div>
             
@@ -529,7 +620,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
         {/* Results Step */}
         {step === 'results' && results && (
           <div>
-            <div className="mb-6">
+            <div className="mb-4">
               <h3 className="font-semibold text-lg">Scheduling Results</h3>
               <div className="flex space-x-4 mt-2">
                 <p className="text-green-600 flex items-center">
@@ -549,6 +640,9 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
               </div>
             </div>
             
+            {/* Show optimization metrics */}
+            {renderMetrics()}
+            
             <div className="space-y-4">
               {results.results.map((result: any, index: number) => (
                 <div 
@@ -559,10 +653,10 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                   {result.success ? (
                     <div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                        <p><span className="font-medium">Date:</span> {formatDate(result.event.startTime || result.event.start)}</p>
-                        <p><span className="font-medium">Time:</span> {formatTime(result.event.startTime || result.event.start)} - {formatTime(result.event.endTime || result.event.end)}</p>
-                        <p><span className="font-medium">Room:</span> {result.event.roomName}</p>
-                        <p><span className="font-medium">Staff:</span> {result.event.staffName}</p>
+                        <p><span className="font-medium">Date:</span> {formatDate(result.event.start || result.event.startTime)}</p>
+                        <p><span className="font-medium">Time:</span> {formatTime(result.event.start || result.event.startTime)} - {formatTime(result.event.end || result.event.endTime)}</p>
+                        <p><span className="font-medium">Room:</span> {result.event.roomName || rooms.find(r => r.id === result.event.roomId)?.name || result.event.roomId}</p>
+                        <p><span className="font-medium">Staff:</span> {result.event.staffName || staff.find(s => s.id === result.event.staffId)?.name || result.event.staffId}</p>
                       </div>
                       
                       {result.softWarnings && result.softWarnings.length > 0 && (

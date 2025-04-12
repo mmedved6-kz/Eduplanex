@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import ConstraintViolationPanel from "../ConstraintViolationPanel";
 
 const schema = z.object({
   id: z.string().min(1, { message: "Event ID is required!" }),
@@ -53,6 +54,10 @@ const EventForm = ({
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("Event Details");
   const router = useRouter();
+  const [showViolationPanel, setShowViolationPanel] = useState(false);
+  const [hardViolations, setHardViolations] = useState<any[]>();
+  const [softViolations, setSoftViolations] = useState<any[]>();
+  const [pendingEvent, setPendingEvent] = useState<any>(null);
   
   // Data states
   const [courses, setCourses] = useState([]);
@@ -275,9 +280,6 @@ const EventForm = ({
     setError("");
 
     try {
-      const url = type === "create" ? "http://localhost:5000/api/events" : `http://localhost:5000/api/events/${data?.id}`;
-      const method = type === "create" ? "POST" : "PUT";
-
       const startDate = new Date(formData.start);
       const endDate = new Date(formData.end);
 
@@ -297,6 +299,44 @@ const EventForm = ({
         recurring: false,
         students: selectedStudents
       };
+
+      console.log("Checking constraints for event:", processedData);
+
+      const constraintsResponse = await fetch("http://localhost:5000/api/constraints/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(processedData),
+      });
+
+      if (!constraintsResponse.ok) {
+        throw new Error("Failed to check constraints");
+      }
+
+      const constraintsResults = await constraintsResponse.json();
+
+      setPendingEvent(processedData);
+      setHardViolations(constraintsResults.hardViolations || []);
+      setSoftViolations(constraintsResults.softViolations || []);
+
+      if (constraintsResults.hardViolations.length > 0 || constraintsResults.softViolations.length > 0) {
+        setShowViolationPanel(true);
+        setLoading(false);
+        return;
+      }
+
+      await saveEvent(processedData);
+
+    } catch (error: any) {
+      setError(error.message || "An error occurred while saving the event");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveEvent = async (processedData: any) => {
+    try {
+      const url = type === "create" ? "http://localhost:5000/api/events" : `http://localhost:5000/api/events/${data?.id}`;
+      const method = type === "create" ? "POST" : "PUT";
 
       console.log("Submitting event data:", processedData);
 
@@ -318,7 +358,7 @@ const EventForm = ({
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -638,6 +678,25 @@ const EventForm = ({
             {loading ? "Loading..." : type === "create" ? "Create" : "Update"}
           </button>
         </div>
+
+        {/* Constraint Violation Panel */}
+        {showViolationPanel && (
+          <ConstraintViolationPanel
+          hardViolations={hardViolations}
+          softViolations={softViolations}
+          event={pendingEvent}
+          onSave={() => {
+            if (pendingEvent) {
+              saveEvent(pendingEvent);
+            }
+            setShowViolationPanel(false);
+          }}
+          onCancel={() => {
+            setShowViolationPanel(false);
+            setLoading(false);
+          }}
+          />
+        )}
       </form>
     </div>
   );

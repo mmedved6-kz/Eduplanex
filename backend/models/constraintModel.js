@@ -7,16 +7,16 @@ const Constraint = {
   /**
    * Checks if a room is already booked for the given time period
    */
-  checkRoomAvailability: async (roomId, startTime, endTime, eventId = null) => {
+  checkRoomAvailability: async (roomId, start_time, end_time, eventId = null) => {
     // SQL to find conflicting events for the same room
-    const params = [roomId, startTime, endTime];
+    const params = [roomId, start_time, end_time];
     let query = `
       SELECT * FROM Event 
       WHERE roomId = $1 
       AND (
-        (startTime <= $2 AND endTime > $2) OR  -- Event starts during another event
-        (startTime < $3 AND endTime >= $3) OR  -- Event ends during another event
-        (startTime >= $2 AND endTime <= $3)    -- Event is completely within the time period
+        (start_time <= $2 AND end_time > $2) OR  -- Event starts during another event
+        (start_time < $3 AND end_time >= $3) OR  -- Event ends during another event
+        (start_time >= $2 AND end_time <= $3)    -- Event is completely within the time period
       )
     `;
     
@@ -36,15 +36,15 @@ const Constraint = {
   /**
    * Checks if a staff member is already scheduled during the given time period
    */
-  checkStaffAvailability: async (staffId, startTime, endTime, eventId = null) => {
-    const params = [staffId, startTime, endTime];
+  checkStaffAvailability: async (staffId, start_time, end_time, eventId = null) => {
+    const params = [staffId, start_time, end_time];
     let query = `
       SELECT * FROM Event 
       WHERE staffId = $1 
       AND (
-        (startTime <= $2 AND endTime > $2) OR
-        (startTime < $3 AND endTime >= $3) OR
-        (startTime >= $2 AND endTime <= $3)
+        (start_time <= $2 AND end_time > $2) OR
+        (start_time < $3 AND end_time >= $3) OR
+        (start_time >= $2 AND end_time <= $3)
       )
     `;
     
@@ -83,9 +83,9 @@ const Constraint = {
     };
   },
 
-  checkStaffPreferredHours: async (startTime, endTime) => {
-    const eventStart = new Date(startTime);
-    const eventEnd = new Date(endTime);
+  checkStaffPreferredHours: async (start_time, end_time) => {
+    const eventStart = new Date(start_time);
+    const eventEnd = new Date(end_time);
     const startHour = eventStart.getHours() + (eventStart.getMinutes() / 60);
     const endHour = eventEnd.getHours() + (eventEnd.getMinutes() / 60);
     
@@ -113,8 +113,8 @@ const Constraint = {
     };
   },
 
-  checkBackToBackClasses: async (staffId, startTime, endTime, eventId = null) => {
-    const eventDate = new Date(startTime);
+  checkBackToBackClasses: async (staffId, start_time, end_time, eventId = null) => {
+    const eventDate = new Date(start_time);
     const dayStart = new Date(eventDate);
     dayStart.setHours(0, 0, 0, 0);
     
@@ -126,8 +126,8 @@ const Constraint = {
     let query = `
       SELECT * FROM Event 
       WHERE staffId = $1 
-      AND startTime >= $2 
-      AND endTime <= $3
+      AND start_time >= $2 
+      AND end_time <= $3
     `;
     
     if (eventId) {
@@ -143,12 +143,12 @@ const Constraint = {
     let message = null;
     
     for (const existingEvent of events) {
-      const existingStart = new Date(existingEvent.starttime);
-      const existingEnd = new Date(existingEvent.endtime);
+      const existingStart = new Date(existingEvent.start_time);
+      const existingEnd = new Date(existingEvent.end_time);
       
       // Calculate time between classes (in minutes)
-      const gapAfterExisting = (new Date(startTime) - existingEnd) / (1000 * 60);
-      const gapBeforeExisting = (existingStart - new Date(endTime)) / (1000 * 60);
+      const gapAfterExisting = (new Date(start_time) - existingEnd) / (1000 * 60);
+      const gapBeforeExisting = (existingStart - new Date(end_time)) / (1000 * 60);
       
       // Check for good gaps (15-30 minutes)
       if ((gapAfterExisting > 0 && gapAfterExisting <= 30) || 
@@ -182,8 +182,8 @@ const Constraint = {
     const { id, roomId, staffId, student_count, start, end } = event;
     
     // Convert start and end to proper format if needed
-    const startTime = new Date(start);
-    const endTime = new Date(end);
+    const start_time = new Date(start);
+    const end_time = new Date(end);
     
     // Check for hard violations
     const hardViolations = [];
@@ -191,8 +191,8 @@ const Constraint = {
     // Check room availability
     const roomCheck = await Constraint.checkRoomAvailability(
       roomId, 
-      startTime, 
-      endTime, 
+      start_time, 
+      end_time, 
       id
     );
     
@@ -207,8 +207,8 @@ const Constraint = {
     // Check staff availability
     const staffCheck = await Constraint.checkStaffAvailability(
       staffId, 
-      startTime, 
-      endTime, 
+      start_time, 
+      end_time, 
       id
     );
     
@@ -235,7 +235,7 @@ const Constraint = {
     const softWarnings = [];
     
     // Check staff preferred hours
-    const preferredHoursCheck = await Constraint.checkStaffPreferredHours(startTime, endTime);
+    const preferredHoursCheck = await Constraint.checkStaffPreferredHours(start_time, end_time);
     if (!preferredHoursCheck.isPreferred) {
       softWarnings.push({
         constraintId: 'staff-preferred-hours',
@@ -245,7 +245,7 @@ const Constraint = {
     }
     
     // Check for back-to-back classes
-    const backToBackCheck = await Constraint.checkBackToBackClasses(staffId, startTime, endTime, id);
+    const backToBackCheck = await Constraint.checkBackToBackClasses(staffId, start_time, end_time, id);
     if (backToBackCheck.hasLongGap) {
       softWarnings.push({
         constraintId: 'back-to-back-classes',
