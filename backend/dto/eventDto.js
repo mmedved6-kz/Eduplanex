@@ -3,18 +3,23 @@ class EventDto {
         this.id = event.id;
         this.title = event.title;
         this.description = event.description;
+        this.eventDate = event.event_date;
+        this.timeslotId = event.timeslot_id;
         
-        // Format dates properly to ISO strings for reliable parsing in frontend
-        this.startTime = event.start_time ? new Date(event.start_time).toISOString() : null;
-        this.endTime = event.end_time ? new Date(event.end_time).toISOString() : null;
+        this.timeslotStart = event.timeslot_start;
+        this.timeslotEnd = event.timeslot_end;
+        this.duration = event.duration_minutes;
         
-        this.startDate = this.startTime ? new Date(this.startTime).toLocaleDateString() : "N/A";
-        this.startTimeFormatted = this.startTime ? new Date(this.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A";
+        this.startTime = event.start_time ? 
+            new Date(event.start_time).toISOString() : null;
+        this.endTime = event.end_time ? 
+            new Date(event.end_time).toISOString() : null;
         
-        this.endDate = this.endTime ? new Date(this.endTime).toLocaleDateString() : "N/A";
-        this.endTimeFormatted = this.endTime ? new Date(this.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A";
+        this.date = this.eventDate ? 
+            new Date(this.eventDate).toLocaleDateString() : "N/A";
+        this.timeRange = (this.timeslotStart && this.timeslotEnd) ? 
+            `${this.timeslotStart} - ${this.timeslotEnd}` : "N/A";
         
-        // Other fields as before
         this.tag = event.tag;
         this.moduleId = event.moduleid;
         this.moduleName = event.modulename || "N/A";

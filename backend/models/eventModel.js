@@ -13,17 +13,21 @@ const Event = {
     
       let query = `
         SELECT 
-          event.*,
-          module.name AS modulename,
-          course.name AS coursename,
-          room.name AS roomname,
-          staff.name AS staffname
-        FROM Event event
-        LEFT JOIN Module module ON event.moduleId = module.id
-        LEFT JOIN Room room ON event.roomId = room.id
-        LEFT JOIN Staff staff ON event.staffId = staff.id
-        LEFT JOIN Course course ON event.courseId = course.id
-        WHERE event.title ILIKE $1
+          e.*,
+          ts.start_time as timeslot_start,
+          ts.end_time as timeslot_end,
+          ts.duration_minutes,
+          m.name AS modulename,
+          c.name AS coursename,
+          r.name AS roomname,
+          s.name AS staffname
+        FROM Event e
+        LEFT JOIN timeslot ts ON e.timeslot_id = ts.id
+        LEFT JOIN Module m ON e.moduleId = m.id
+        LEFT JOIN Room r ON e.roomId = r.id
+        LEFT JOIN Staff s ON e.staffId = s.id
+        LEFT JOIN Course c ON e.courseId = c.id
+        WHERE e.title ILIKE $1
       `;
     
       if (filters.staffId) {
@@ -57,21 +61,22 @@ const Event = {
 
     create: async (event) => {
       const { 
-        id, title, description, start_time, end_time, 
-        moduleId, roomId, staffId, student_count, tag, courseId, students 
+        id, title, description, event_date, timeslot_id, 
+        start_time, end_time, moduleId, roomId, staffId, 
+        student_count, tag, courseId, students 
       } = event;
-
-      const startDate = new Date(start_time);
-      const endDate = new Date(end_time);
       
       return await db.tx(async t => {
         // Create event
         const newEvent = await t.one(
           `INSERT INTO Event 
-           (id, title, description, start_time, end_time, tag, moduleId, roomId, staffId, student_count, courseId) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+           (id, title, description, event_date, timeslot_id, start_time, end_time, 
+            tag, moduleId, roomId, staffId, student_count, courseId) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
            RETURNING *`,
-          [id, title, description, startDate, endDate, tag, moduleId, roomId, staffId, student_count, courseId]
+          [id, title, description, event_date, timeslot_id, 
+            start_time, end_time, tag, moduleId, roomId, staffId, 
+            student_count, courseId]
         );
         
         // If we have students, create relationships
@@ -118,8 +123,9 @@ const Event = {
     // Update an event
     update: async (id, updates) => {
       const { 
-        title, description, start_time, end_time, 
-        moduleId, roomId, staffId, student_count, tag, courseId, students 
+        title, description, event_date, timeslot_id, 
+        start_time, end_time, moduleId, roomId, staffId, 
+        student_count, tag, courseId, students 
       } = updates;
       
       const startDate = new Date(start_time);
@@ -131,17 +137,22 @@ const Event = {
           `UPDATE Event SET 
               title = $1,
               description = $2,
-              start_time = $3,
-              end_time = $4,
-              moduleId = $5,
-              roomId = $6,
-              staffId = $7,
-              student_count = $8,
-              tag = $9,
-              courseId = $10
+              event_date = $3,
+              timeslot_id = $4,
+              start_time = $5,
+              end_time = $6,
+              moduleId = $7,
+              roomId = $8,
+              staffId = $9,
+              student_count = $10,
+              tag = $11,
+              courseId = $12
+              students = $13,
            WHERE id = $11
            RETURNING *`,
-          [title, description, startDate, endDate, moduleId, roomId, staffId, student_count, tag, courseId, id]
+          [title, description, event_date, timeslot_id, 
+            start_time, end_time, moduleId, roomId, staffId, 
+            student_count, tag, courseId, students, id]
         );
         
         // Update student relationships - first remove all existing

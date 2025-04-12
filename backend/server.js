@@ -11,7 +11,8 @@ const errorMiddleware = require('./middleware/errorMiddleware');
 const statsRoutes = require('./routes/statsRoutes');
 const roomRoutes = require('./routes/roomRoutes'); 
 const actionRoutes = require('./routes/actionRoutes');
-const uploadRoutes = require('./routes/imageUploadRoute'); // Image upload route
+const uploadRoutes = require('./routes/imageUploadRoute');
+const timeslotRoutes = require('./routes/timeslotRoutes');
 const cors = require('cors');
 const app = express();
 
@@ -30,7 +31,8 @@ app.use('/api/scheduler', schedulerServiceRoutes);
 app.use('/api/stats', statsRoutes); 
 app.use('/api/rooms', roomRoutes);
 app.use('/api/actions', actionRoutes); 
-app.use('/api/upload', uploadRoutes); // Image upload route
+app.use('/api/upload', uploadRoutes); 
+app.use('/api/timeslots', timeslotRoutes);
 
 // Error handling middleware
 app.use(errorMiddleware);
