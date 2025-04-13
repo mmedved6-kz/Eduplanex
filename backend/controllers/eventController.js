@@ -63,8 +63,12 @@ const createEvent = async (req, res) => {
             id: req.body.id,
             title: req.body.title,
             description: req.body.description,
-            start_time: new Date(req.body.start_time || req.body.start),
-            end_time: new Date(req.body.end_time || req.body.end),
+            event_date: req.body.event_date || null,
+            timeslot_id: req.body.timeslot_id || null,
+            start_time: req.body.event_date && req.body.timeslot_id ? 
+                null : new Date(req.body.start_time || req.body.start),
+            end_time: req.body.event_date && req.body.timeslot_id ? 
+                null : new Date(req.body.end_time || req.body.end),
             moduleId: req.body.moduleId || req.body.module_id,
             roomId: req.body.roomId || req.body.room_id,
             staffId: req.body.staffId || req.body.staff_id,
@@ -93,8 +97,12 @@ const updateEvent = async (req, res) => {
         const eventData = {
             title: req.body.title,
             description: req.body.description,
-            start_time: new Date(req.body.start_time || req.body.start),
-            end_time: new Date(req.body.end_time || req.body.end),
+            event_date: req.body.event_date || null,
+            timeslot_id: req.body.timeslot_id || null,
+            start_time: req.body.event_date && req.body.timeslot_id ? 
+                null : new Date(req.body.start_time || req.body.start),
+            end_time: req.body.event_date && req.body.timeslot_id ? 
+                null : new Date(req.body.end_time || req.body.end),
             moduleId: req.body.moduleId || req.body.module_id,
             roomId: req.body.roomId || req.body.room_id,
             staffId: req.body.staffId || req.body.staff_id,

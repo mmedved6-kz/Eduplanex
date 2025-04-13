@@ -3,8 +3,8 @@ const db = require('../config/db');
 const Event = {
     // Get all events
     getAll: async (limit, offset, searchQuery, sortColumn, sortOrder, filters = {}) => {
-      const validColumns = ['event.title', 'module.name', 'event.start_time', 'event.tag'];
-      const defaultSort = 'event.start_time';
+      const validColumns = ['event.title', 'module.name', 'event.start_time', 'event.tag', 'event.event_date'];
+      const defaultSort = 'event.event_date';
     
       const actualSortColumn = validColumns.includes(sortColumn) ? sortColumn : defaultSort;
       const actualSortOrder = ['ASC', 'DESC'].includes(sortOrder) ? sortOrder : 'ASC';
@@ -13,7 +13,7 @@ const Event = {
     
       let query = `
         SELECT 
-          e.*,
+          event.*,
           ts.start_time as timeslot_start,
           ts.end_time as timeslot_end,
           ts.duration_minutes,
@@ -21,13 +21,13 @@ const Event = {
           c.name AS coursename,
           r.name AS roomname,
           s.name AS staffname
-        FROM Event e
-        LEFT JOIN timeslot ts ON e.timeslot_id = ts.id
-        LEFT JOIN Module m ON e.moduleId = m.id
-        LEFT JOIN Room r ON e.roomId = r.id
-        LEFT JOIN Staff s ON e.staffId = s.id
-        LEFT JOIN Course c ON e.courseId = c.id
-        WHERE e.title ILIKE $1
+        FROM Event event
+        LEFT JOIN timeslot ts ON event.timeslot_id = ts.id
+        LEFT JOIN Module m ON event.moduleId = m.id
+        LEFT JOIN Room r ON event.roomId = r.id
+        LEFT JOIN Staff s ON event.staffId = s.id
+        LEFT JOIN Course c ON event.courseId = c.id
+        WHERE event.title ILIKE $1
       `;
     
       if (filters.staffId) {
@@ -45,17 +45,20 @@ const Event = {
     getById: async (id) => {
         return await db.oneOrNone(`
             SELECT 
-                e.*,
+                event.*,
+                ts.start_time as timeslot_start,
+                ts.end_time as timeslot_end,
+                ts.duration_minutes,
                 m.name AS modulename,
                 r.name AS roomname,
                 s.name AS staffname,
                 c.name AS coursename
-            FROM Event e
-            LEFT JOIN Module m ON e.moduleId = m.id
-            LEFT JOIN Room r ON e.roomId = r.id
-            LEFT JOIN Staff s ON e.staffId = s.id
-            LEFT JOIN Course c ON e.courseId = c.id
-            WHERE e.id = $1
+            FROM Event event
+            LEFT JOIN Module m ON event.moduleId = m.id
+            LEFT JOIN Room r ON event.roomId = r.id
+            LEFT JOIN Staff s ON event.staffId = s.id
+            LEFT JOIN Course c ON event.courseId = c.id
+            WHERE event.id = $1
         `, [id]);
     },
 
@@ -147,12 +150,11 @@ const Event = {
               student_count = $10,
               tag = $11,
               courseId = $12
-              students = $13,
-           WHERE id = $11
+           WHERE id = $13
            RETURNING *`,
           [title, description, event_date, timeslot_id, 
             start_time, end_time, moduleId, roomId, staffId, 
-            student_count, tag, courseId, students, id]
+            student_count, tag, courseId, id]
         );
         
         // Update student relationships - first remove all existing
@@ -189,18 +191,20 @@ const Event = {
     try {
       const events = await db.any(`
         SELECT 
-          e.*,
+          event.*,
+          ts.start_time as timeslot_start,
+          ts.end_time as timeslot_end,
           m.name AS modulename,
           r.name AS roomname,
           s.name AS staffname,
           c.name AS coursename
-        FROM Event e
-        LEFT JOIN Module m ON e.moduleId = m.id
-        LEFT JOIN Room r ON e.roomId = r.id
-        LEFT JOIN Staff s ON e.staffId = s.id
-        LEFT JOIN Course c ON e.courseId = c.id
-        WHERE e.start_time >= CURRENT_DATE
-        ORDER BY e.start_time ASC
+        FROM Event event
+        LEFT JOIN Module m ON event.moduleId = m.id
+        LEFT JOIN Room r ON event.roomId = r.id
+        LEFT JOIN Staff s ON event.staffId = s.id
+        LEFT JOIN Course c ON event.courseId = c.id
+        WHERE event.start_time >= CURRENT_DATE
+        ORDER BY event.start_time ASC
         LIMIT 100
       `);
       
@@ -208,8 +212,9 @@ const Event = {
       return events.map(event => ({
         id: event.id,
         title: event.title,
-        startTime: event.start_time,
-        endTime: event.end_time,
+        eventDate: event.event_date,
+        startTime: event.timeslot_start,
+        endTime: event.timeslot_end,
         description: event.description,
         tag: event.tag,
         moduleName: event.modulename,
@@ -222,6 +227,7 @@ const Event = {
       throw error;
     }
   }
+  
 };
 
 module.exports = Event;

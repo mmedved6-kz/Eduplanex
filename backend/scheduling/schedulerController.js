@@ -101,9 +101,9 @@ const backtrackScheduleEvent = async (eventData) => {
     
     // Set up the backtracking state
     const state = {
-      rooms: availableRooms,
-      staff: availableStaff,
-      timeSlots,
+      rooms: availableRooms || [],
+      staff: availableStaff || [],
+      timeSlots: timeSlots || [],
       existingEvents: existingEvents.map(e => ({
         id: e.id,
         roomId: e.roomId,
@@ -203,11 +203,16 @@ const backtrackSearch = async (assignment, depth, state) => {
   // Get the options to try at this level
   let options;
   if (depth === 0) {
-    options = state.rooms;
+    options = state.rooms || [];  // Add fallback to empty array
   } else if (depth === 1) {
-    options = state.staff;
+    options = state.staff || [];  // Add fallback to empty array
   } else { // depth === 2
-    options = state.timeSlots;
+    options = state.timeSlots || []; // Add fallback to empty array
+  }
+
+  if (!Array.isArray(options)) {
+    console.warn(`No valid options for depth ${depth}. Using empty array.`);
+    options = [];
   }
   
   // Try each option

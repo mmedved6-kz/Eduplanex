@@ -36,21 +36,21 @@ const TimeSlot = {
       WITH busy_slots AS (
         SELECT ts.id
         FROM timeslot ts
-        JOIN event e ON e.timeslot_id = ts.id
-        WHERE e.event_date = $1
+        JOIN event event ON event.timeslot_id = ts.id
+        WHERE event.event_date = $1
     `;
     
     const params = [date];
     let paramIndex = 2;
     
     if (roomId) {
-      query += ` AND e.roomid = $${paramIndex}`;
+      query += ` AND event.roomid = $${paramIndex}`;
       params.push(roomId);
       paramIndex++;
     }
     
     if (staffId) {
-      query += ` AND e.staffid = $${paramIndex}`;
+      query += ` AND event.staffid = $${paramIndex}`;
       params.push(staffId);
       paramIndex++;
     }
@@ -70,9 +70,9 @@ const TimeSlot = {
           WHERE r.capacity >= $${paramIndex}
           AND NOT EXISTS (
             SELECT 1 FROM event e
-            WHERE e.event_date = $1
-            AND e.timeslot_id = ts.id
-            AND e.roomid = r.id
+            WHERE event.event_date = $1
+            AND event.timeslot_id = ts.id
+            AND event.roomid = r.id
           )
         )
       `;

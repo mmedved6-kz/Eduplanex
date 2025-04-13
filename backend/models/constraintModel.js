@@ -1,5 +1,10 @@
 const db = require('../config/db');
 
+// Helper to convert time strings to minutes
+function timeToMinutes(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
 /**
  * Model for handling constraint checking and enforcement
  */
@@ -7,17 +12,14 @@ const Constraint = {
   /**
    * Checks if a room is already booked for the given time period
    */
-  checkRoomAvailability: async (roomId, start_time, end_time, eventId = null) => {
-    // SQL to find conflicting events for the same room
-    const params = [roomId, start_time, end_time];
+  checkRoomAvailability: async (roomId, date, timeslotId, eventId = null) => {
+    // SQL to find conflicting events for the same room on the same date and timeslot
+    const params = [roomId, date, timeslotId];
     let query = `
       SELECT * FROM Event 
       WHERE roomId = $1 
-      AND (
-        (start_time <= $2 AND end_time > $2) OR  -- Event starts during another event
-        (start_time < $3 AND end_time >= $3) OR  -- Event ends during another event
-        (start_time >= $2 AND end_time <= $3)    -- Event is completely within the time period
-      )
+      AND event_date = $2
+      AND timeslot_id = $3
     `;
     
     // If we're updating an existing event, exclude it from the check
@@ -36,16 +38,13 @@ const Constraint = {
   /**
    * Checks if a staff member is already scheduled during the given time period
    */
-  checkStaffAvailability: async (staffId, start_time, end_time, eventId = null) => {
-    const params = [staffId, start_time, end_time];
+  checkStaffAvailability: async (staffId, date, timeslotId, eventId = null) => {
+    const params = [staffId, date, timeslotId];
     let query = `
       SELECT * FROM Event 
       WHERE staffId = $1 
-      AND (
-        (start_time <= $2 AND end_time > $2) OR
-        (start_time < $3 AND end_time >= $3) OR
-        (start_time >= $2 AND end_time <= $3)
-      )
+      AND event_date = $2
+      AND timeslot_id = $3
     `;
     
     if (eventId) {
@@ -83,11 +82,10 @@ const Constraint = {
     };
   },
 
-  checkStaffPreferredHours: async (start_time, end_time) => {
-    const eventStart = new Date(start_time);
-    const eventEnd = new Date(end_time);
-    const startHour = eventStart.getHours() + (eventStart.getMinutes() / 60);
-    const endHour = eventEnd.getHours() + (eventEnd.getMinutes() / 60);
+  checkStaffPreferredHours: async (start_time) => {
+    // Parse the time (assuming format like '09:30:00')
+    const [hours, minutes] = start_time.split(':').map(Number);
+    const startHour = hours + (minutes / 60);
     
     // Define "ideal" teaching hours (9:30 AM - 4:30 PM)
     const idealStartHour = 9.5;  // 9:30 AM
@@ -97,45 +95,42 @@ const Constraint = {
     const lunchStartHour = 12;
     const lunchEndHour = 13;
     
-    const isWithinIdealHours = startHour >= idealStartHour && endHour <= idealEndHour;
-    const overlapsLunch = startHour < lunchEndHour && endHour > lunchStartHour;
+    const isWithinIdealHours = startHour >= idealStartHour && startHour < idealEndHour;
+    const isLunchHour = startHour >= lunchStartHour && startHour < lunchEndHour;
     
     let message = null;
     if (!isWithinIdealHours) {
       message = 'Class scheduled outside preferred teaching hours (9:30 AM - 4:30 PM)';
-    } else if (overlapsLunch) {
-      message = 'Class overlaps with typical lunch hours (12 PM - 1 PM)';
+    } else if (isLunchHour) {
+      message = 'Class scheduled during typical lunch hours (12 PM - 1 PM)';
     }
     
     return {
-      isPreferred: isWithinIdealHours && !overlapsLunch,
+      isPreferred: isWithinIdealHours && !isLunchHour,
       message: message
     };
   },
 
-  checkBackToBackClasses: async (staffId, start_time, end_time, eventId = null) => {
-    const eventDate = new Date(start_time);
-    const dayStart = new Date(eventDate);
-    dayStart.setHours(0, 0, 0, 0);
-    
-    const dayEnd = new Date(eventDate);
-    dayEnd.setHours(23, 59, 59, 999);
-    
-    // Get all events for this staff on the same day
-    const params = [staffId, dayStart, dayEnd];
+  checkBackToBackClasses: async (staffId, event_date, timeslot_id, eventId = null) => {
+    // Get all events for this staff on the selected date
+    const params = [staffId, event_date];
     let query = `
-      SELECT * FROM Event 
-      WHERE staffId = $1 
-      AND start_time >= $2 
-      AND end_time <= $3
+      SELECT event.*, timeslot.start_time, timeslot.end_time 
+      FROM Event event
+      JOIN timeslot timeslot ON event.timeslot_id = timeslot.id
+      WHERE event.staffId = $1 
+      AND event.event_date = $2
     `;
     
     if (eventId) {
-      query += ' AND id != $4';
+      query += ' AND event.id != $3';
       params.push(eventId);
     }
     
     const events = await db.any(query, params);
+    
+    // Get the timeslot for the current event
+    const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslot_id]);
     
     // Check for optimal gaps (15-30 minutes between classes)
     let hasOptimalGap = false;
@@ -143,12 +138,18 @@ const Constraint = {
     let message = null;
     
     for (const existingEvent of events) {
-      const existingStart = new Date(existingEvent.start_time);
-      const existingEnd = new Date(existingEvent.end_time);
+      // Calculate time gaps between events (in minutes)
+      // Convert time strings to minutes for comparison
+      const currentStartMinutes = timeToMinutes(currentTimeslot.start_time);
+      const currentEndMinutes = timeToMinutes(currentTimeslot.end_time);
+      const existingStartMinutes = timeToMinutes(existingEvent.start_time);
+      const existingEndMinutes = timeToMinutes(existingEvent.end_time);
       
-      // Calculate time between classes (in minutes)
-      const gapAfterExisting = (new Date(start_time) - existingEnd) / (1000 * 60);
-      const gapBeforeExisting = (existingStart - new Date(end_time)) / (1000 * 60);
+      // Calculate gap after existing event
+      const gapAfterExisting = currentStartMinutes - existingEndMinutes;
+      
+      // Calculate gap before existing event
+      const gapBeforeExisting = existingStartMinutes - currentEndMinutes;
       
       // Check for good gaps (15-30 minutes)
       if ((gapAfterExisting > 0 && gapAfterExisting <= 30) || 
@@ -179,11 +180,19 @@ const Constraint = {
    * Performs all constraint checks for an event
    */
   validateEvent: async (event) => {
-    const { id, roomId, staffId, student_count, start, end } = event;
+    const { id, roomId, staffId, student_count, event_date, timeslot_id } = event;
     
-    // Convert start and end to proper format if needed
-    const start_time = new Date(start);
-    const end_time = new Date(end);
+    const timeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslot_id]);
+    if (!timeslot) {
+      return {
+        hardViolations: [{
+          constraintId: 'invalid-timeslot',
+          type: 'HARD',
+          message: 'The specified timeslot does not exist'
+        }],
+        softWarnings: []
+      };
+    }
     
     // Check for hard violations
     const hardViolations = [];
@@ -191,8 +200,8 @@ const Constraint = {
     // Check room availability
     const roomCheck = await Constraint.checkRoomAvailability(
       roomId, 
-      start_time, 
-      end_time, 
+      event_date, 
+      timeslot_id, 
       id
     );
     
@@ -207,8 +216,8 @@ const Constraint = {
     // Check staff availability
     const staffCheck = await Constraint.checkStaffAvailability(
       staffId, 
-      start_time, 
-      end_time, 
+      event_date, 
+      timeslot_id, 
       id
     );
     
@@ -235,7 +244,7 @@ const Constraint = {
     const softWarnings = [];
     
     // Check staff preferred hours
-    const preferredHoursCheck = await Constraint.checkStaffPreferredHours(start_time, end_time);
+    const preferredHoursCheck = await Constraint.checkStaffPreferredHours(timeslot.start_time);
     if (!preferredHoursCheck.isPreferred) {
       softWarnings.push({
         constraintId: 'staff-preferred-hours',
@@ -245,7 +254,7 @@ const Constraint = {
     }
     
     // Check for back-to-back classes
-    const backToBackCheck = await Constraint.checkBackToBackClasses(staffId, start_time, end_time, id);
+    const backToBackCheck = await Constraint.checkBackToBackClasses(staffId, event_date, timeslot_id, id);
     if (backToBackCheck.hasLongGap) {
       softWarnings.push({
         constraintId: 'back-to-back-classes',
@@ -268,13 +277,13 @@ const getViolations = async () => {
       SELECT 
         v.id, 
         v.event_id AS "eventId", 
-        e.title AS "eventTitle", 
+        event.title AS "eventTitle", 
         v.constraint_type AS "constraintType", 
         'HARD' AS severity,
         v.message, 
         TO_CHAR(v.created_at, 'YYYY-MM-DD') AS date
       FROM event_violations v
-      JOIN Event e ON v.event_id = e.id
+      JOIN Event event ON v.event_id = event.id
       ORDER BY v.created_at DESC
       LIMIT 10
     `);
@@ -284,13 +293,13 @@ const getViolations = async () => {
       SELECT 
         w.id, 
         w.event_id AS "eventId", 
-        e.title AS "eventTitle", 
+        event.title AS "eventTitle", 
         w.constraint_type AS "constraintType", 
         'SOFT' AS severity,
         w.message, 
         TO_CHAR(w.created_at, 'YYYY-MM-DD') AS date
       FROM event_warnings w
-      JOIN Event e ON w.event_id = e.id
+      JOIN Event event ON w.event_id = event.id
       ORDER BY w.created_at DESC
       LIMIT 10
     `);

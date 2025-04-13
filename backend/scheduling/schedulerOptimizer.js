@@ -17,39 +17,38 @@ class SchedulerOptimizer {
      * @param {Array} daysToInclude 
      * @returns {Array} Array of time slots
      */
-  static generateTimeSlots(startDate, endDate, durationMinutes = 60, daysToSchedule = [1, 2, 3, 4, 5]) {
-    const slots = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    // For each day in the range
-    for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
-      // Skip days that aren't in our scheduling days
-      if (!daysToSchedule.includes(day.getDay())) continue;
+    static async generateTimeSlots(startDate, endDate, durationMinutes = 60, daysToSchedule = [1, 2, 3, 4, 5]) {
+      const slots = [];
       
-      // For each hour from 8 AM to 5 PM (configurable)
-      for (let hour = 8; hour < 17; hour++) {
-        // For each slot within the hour (e.g., 9:00, 9:30 for 30-min slots)
-        for (let minute = 0; minute < 60; minute += 30) {  // Allow 30-min increments
-          const slotStart = new Date(day);
-          slotStart.setHours(hour, minute, 0, 0);
-          
-          const slotEnd = new Date(day);
-          slotEnd.setMinutes(slotStart.getMinutes() + durationMinutes);
-          
-          // Only add slots that end before 6 PM
-          if (slotEnd.getHours() < 18) {
-            slots.push({
-              start: slotStart,
-              end: slotEnd
-            });
-          }
+      // Fetch all timeslot definitions from the database
+      const timeslots = await db.any(
+        `SELECT * FROM timeslot 
+         WHERE ABS(duration_minutes - $1) <= 30
+         ORDER BY start_time`,
+        [durationMinutes]
+      );
+      
+      // For each day in the range
+      for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
+        // Skip days that aren't in our scheduling days
+        if (!daysToSchedule.includes(day.getDay())) continue;
+        
+        const dateStr = day.toISOString().split('T')[0];
+        
+        // Add each timeslot for this day
+        for (const timeslot of timeslots) {
+          slots.push({
+            date: dateStr,
+            timeslotId: timeslot.id,
+            timeslot: timeslot,
+            formattedDate: day.toLocaleDateString(),
+            formattedTime: `${timeslot.start_time} - ${timeslot.end_time}`
+          });
         }
       }
+      
+      return slots;
     }
-    
-    return slots;
-  }
 
     /**
      * Fetch all constraints and fetch events needed for scehduling
@@ -295,22 +294,17 @@ class SchedulerOptimizer {
     // Check room and staff conflicts
     schedule.forEach(event => {
       // Create unique identifiers for the time slots
-      const start = event.start instanceof Date ? event.start : new Date(event.start);
-      const end = event.end instanceof Date ? event.end : new Date(event.end);
-  
-      const day = start.toDateString();
-      const timeRange = `${start.toTimeString().slice(0,8)}-${end.toTimeString().slice(0,8)}`;
-      const timeSlot = `${day}:${timeRange}`;
+      const dateTimeslotKey = `${event.event_date}:${event.timeslot_id}`;
       
       // Check room conflicts
       if (!roomBookings[event.roomId]) {
         roomBookings[event.roomId] = new Set();
       }
       
-      if (roomBookings[event.roomId].has(timeSlot)) {
+      if (roomBookings[event.roomId].has(dateTimeslotKey)) {
         hardViolations++;
       } else {
-        roomBookings[event.roomId].add(timeSlot);
+        roomBookings[event.roomId].add(dateTimeslotKey);
       }
       
       // Check staff conflicts
@@ -318,10 +312,10 @@ class SchedulerOptimizer {
         staffBookings[event.staffId] = new Set();
       }
       
-      if (staffBookings[event.staffId].has(timeSlot)) {
+      if (staffBookings[event.staffId].has(dateTimeslotKey)) {
         hardViolations++;
       } else {
-        staffBookings[event.staffId].add(timeSlot);
+        staffBookings[event.staffId].add(dateTimeslotKey);
       }
       
       // Check room capacity
@@ -446,7 +440,7 @@ class SchedulerOptimizer {
       console.log(`Starting genetic algorithm optimization for ${eventsToSchedule.length} events`);
       
       const cleanEvents = eventsToSchedule.map(event => {
-        const { start, end, ...cleanEvent } = event;
+          const { start, end, ...cleanEvent } = event;
           return cleanEvent;
       });
 
@@ -461,13 +455,42 @@ class SchedulerOptimizer {
       // Convert day preferences to numbers
       const daysToSchedule = preferences.daysOfWeek.map(d => parseInt(d));
       
-      // Generate time slots
-      const timeSlots = this.generateTimeSlots(
-        startDate, 
-        endDate, 
-        60, // Default duration
-        daysToSchedule
-      );
+      const allTimeslots = await db.any('SELECT * FROM timeslot ORDER BY start_time');
+
+      const slots = [];
+      for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
+        if (!daysToSchedule.includes(day.getDay())) continue;
+
+        const dateStr = day.toISOString().split('T')[0];
+
+        for (const timeslot of allTimeslots) {
+          if (preferences.timeRange !== 'any') {
+            const hour = parseInt(timeslot.start_time.split(':')[0]);
+            if (preferences.timeRange === 'morning' && hour >= 12) continue;
+            if (preferences.timeRange === 'afternoon' && hour < 12) continue;
+          }
+
+          slots.push({
+            date: dateStr,
+            timeslotId: timeslot.id,
+            timeslot:timeslot
+          });
+        }
+      }
+
+      const availableSlots = [];
+      for (const slot of slots) {
+        const hasConflict = existingEvents.some(event => 
+          event.event_date === slot.date &&
+          event.timeslot_id === slot.timeslotId
+        );
+
+        if (!hasConflict) {
+          availableSlots.push(slot);
+        }
+      }
+
+      console.log(`Generated ${availableSlots.length} available slots for scheduling`);
       
       // Create the scheduling problem definition
       const problem = {
@@ -483,18 +506,20 @@ class SchedulerOptimizer {
       const result = await this.runGeneticAlgorithm(problem);
       
       // Map scheduled events to format expected by frontend
-      const scheduledEvents = result.bestChromosome.genes.map(gene => ({
-        id: gene.event.id || this.generateEventId(),
-        title: gene.event.title,
-        start: gene.timeSlot.start,
-        end: gene.timeSlot.end,
-        roomId: gene.room.id,
-        staffId: gene.staff.id,
-        moduleId: gene.event.moduleId,
-        student_count: gene.event.student_count,
-        tag: gene.event.tag || 'CLASS',
-        students: gene.event.students || []
-      }));
+      const scheduledEvents = result.bestChromosome.genes.map(gene => {
+        return {
+          id: gene.event.id || this.generateEventId(),
+          title: gene.event.title,
+          event_date: gene.timeSlot.date,
+          timeslot_id: gene.timeSlot.timeslotId,
+          roomId: gene.room.id,
+          staffId: gene.staff.id,
+          moduleId: gene.event.moduleId,
+          student_count: gene.event.student_count,
+          tag: gene.event.tag || 'CLASS',
+          students: gene.event.students || []
+        }
+      });
       
       // Identify events that couldn't be scheduled
       const scheduledModuleIds = scheduledEvents.map(e => e.moduleId);

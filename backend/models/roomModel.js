@@ -121,6 +121,38 @@ const Room = {
 
         return await db.one(query, params);
     },
+
+    // Find available rooms for a specific time slot and capacity
+    findAvailable: async (startTime, endTime, minCapacity = 0, buildingId = null, roomType = null) => {
+        const params = [startTime, endTime, minCapacity];
+        
+        let query = `
+            SELECT r.*, b.name AS buildingName
+            FROM Room r
+            LEFT JOIN Building b ON r.buildingId = b.id
+            WHERE r.capacity >= $3
+            AND r.id NOT IN (
+                SELECT roomId FROM Event
+                WHERE (startTime <= $1 AND endTime > $1)
+                OR (startTime < $2 AND endTime >= $2)
+                OR (startTime >= $1 AND endTime <= $2)
+            )
+        `;
+        
+        if (buildingId) {
+            params.push(buildingId);
+            query += ` AND r.buildingId = $${params.length}`;
+        }
+        
+        if (roomType) {
+            params.push(roomType);
+            query += ` AND r.room_type = $${params.length}`;
+        }
+        
+        query += ` ORDER BY r.capacity ASC`;
+        
+        return await db.any(query, params);
+    }
 };
 
 module.exports = Room;

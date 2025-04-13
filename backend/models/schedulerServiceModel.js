@@ -11,19 +11,22 @@ const SchedulerService = {
   /**
    * Get available rooms for a given time slot and capacity
    */
-  getAvailableRooms: async (start_time, end_time, requiredCapacity) => {
+  getAvailableRooms: async (date, timeslotId, requiredCapacity) => {
     try {
       // Get all rooms with sufficient capacity
-      const rooms = await Room.getAll();
+      const rooms = await Room.getAll(1000, 0, '', 'room.capacity', 'ASC', {
+        minCapacity: requiredCapacity
+      });
+      
       const suitableRooms = rooms.filter(room => room.capacity >= requiredCapacity);
       
-      // Check availability for each room
+      // Check availability for each room on this date and timeslot
       const availableRooms = [];
       for (const room of suitableRooms) {
         const availability = await Constraint.checkRoomAvailability(
           room.id, 
-          start_time, 
-          end_time
+          date, 
+          timeslotId
         );
         
         if (availability.available) {
@@ -41,7 +44,7 @@ const SchedulerService = {
   /**
    * Get available staff for a given time slot
    */
-  getAvailableStaff: async (start_time, end_time, departmentId = null) => {
+  getAvailableStaff: async (date, timeslotId, departmentId = null) => {
     try {
       // Get all staff or filter by department
       const query = departmentId ? { departmentId } : {};
@@ -52,8 +55,8 @@ const SchedulerService = {
       for (const member of staff) {
         const availability = await Constraint.checkStaffAvailability(
           member.id, 
-          start_time, 
-          end_time
+          date, 
+          timeslotId
         );
         
         if (availability.available) {
@@ -67,20 +70,52 @@ const SchedulerService = {
       throw error;
     }
   },
+
+  getAvailableSlots: async (date, requiredCapacity, roomId = null, staffId = null) => {
+    try {
+      // Get available timeslots for the date
+      const timeslots = await Timeslot.findAvailable(
+        date,
+        roomId,
+        staffId,
+        requiredCapacity
+      );
+      
+      return timeslots.map(ts => ({
+        timeslotId: ts.id,
+        startTime: ts.start_time,
+        endTime: ts.end_time,
+        duration: ts.duration_minutes
+      }));
+    } catch (error) {
+      console.error('Error finding available timeslots:', error);
+      throw error;
+    }
+  },
   
   findAvailableTimeSlot: async (eventData, maxAttempts = 5) => {
     console.log("Finding available time slot for: ", eventData.title);
     
-    // Determine original requested time if provided
-    let preferredStart = eventData.start ? new Date(eventData.start) : null;
-    let preferredEnd = eventData.end ? new Date(eventData.end) : null;
+    // Determine preferred date and timeslot if provided
+    let preferredDate = eventData.event_date ? new Date(eventData.event_date) : null;
+    let preferredTimeslotId = eventData.timeslot_id || null;
     
-    // If preferred time is specified, try that first
-    if (preferredStart && preferredEnd) {
-      // Try the preferred time slot
+    // If preferred date and timeslot are specified, try that first
+    if (preferredDate && preferredTimeslotId) {
+      // Get the timeslot details
+      const timeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [preferredTimeslotId]);
+      
+      if (!timeslot) {
+        return {
+          success: false,
+          message: 'Invalid timeslot specified'
+        };
+      }
+      
+      // Try the preferred date and timeslot
       const availableRooms = await SchedulerService.getAvailableRooms(
-        preferredStart, 
-        preferredEnd, 
+        preferredDate.toISOString().split('T')[0],
+        preferredTimeslotId,
         eventData.student_count || 0
       );
       
@@ -89,98 +124,95 @@ const SchedulerService = {
       const departmentId = moduleInfo?.departmentid;
       
       const availableStaff = await SchedulerService.getAvailableStaff(
-        preferredStart, 
-        preferredEnd, 
+        preferredDate.toISOString().split('T')[0],
+        preferredTimeslotId,
         departmentId
       );
       
       if (availableRooms.length > 0 && availableStaff.length > 0) {
         return {
           success: true,
-          start: preferredStart,
-          end: preferredEnd,
+          date: preferredDate.toISOString().split('T')[0],
+          timeslotId: preferredTimeslotId,
+          timeslot: timeslot,
           availableRooms,
           availableStaff
         };
       }
       
-      console.log("Preferred time slot not available, trying alternatives...");
+      console.log("Preferred date and timeslot not available, trying alternatives...");
     }
     
-    // Calculate duration to maintain for alternative slots
-    const durationMinutes = preferredStart && preferredEnd ? 
-      Math.floor((preferredEnd - preferredStart) / (1000 * 60)) : 60; // Default to 1 hour
+    // Get required duration from event data or use default
+    const desiredDuration = eventData.duration_minutes || 60;
     
-    // Try different time slots
+    // Generate potential dates (next 30 days, focusing on weekdays)
+    const potentialDates = [];
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
+    
+    for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
+      // Skip weekends (0 = Sunday, 6 = Saturday)
+      if (day.getDay() !== 0 && day.getDay() !== 6) {
+        potentialDates.push(new Date(day));
+      }
+    }
+    
+    // Try different date and timeslot combinations
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Generate a random day (Monday - Friday)
-      const day = Math.floor(Math.random() * 5) + 1; // 1 = Monday, 5 = Friday
+      // Pick a random date from potential dates
+      const randomDateIndex = Math.floor(Math.random() * potentialDates.length);
+      const tryDate = potentialDates[randomDateIndex];
+      const dateStr = tryDate.toISOString().split('T')[0];
       
-      // Generate a random time between 9:00 and 16:00
-      // Using if-else and randomization for a more "student-like" approach
-      let hour, minute;
+      // Get suitable timeslots for this date (closest to the desired duration)
+      const suitableTimeslots = await db.any(
+        `SELECT * FROM timeslot 
+         WHERE ABS(duration_minutes - $1) <= 30
+         ORDER BY ABS(duration_minutes - $1), start_time`,
+        [desiredDuration]
+      );
       
-      if (Math.random() < 0.7) {
-        // 70% chance to be during core hours (10:00-15:00)
-        hour = 10 + Math.floor(Math.random() * 5);
-      } else {
-        // 30% chance to be early or late
-        if (Math.random() < 0.5) {
-          hour = 9; // Early morning
-        } else {
-          hour = 15 + Math.floor(Math.random() * 2); // Late afternoon (15:00-16:00)
+      if (suitableTimeslots.length === 0) {
+        continue; // No suitable timeslots found for the duration
+      }
+      
+      // Try each timeslot until we find an available one
+      for (const timeslot of suitableTimeslots) {
+        // Check availability for this date and timeslot
+        const availableRooms = await SchedulerService.getAvailableRooms(
+          dateStr,
+          timeslot.id,
+          eventData.student_count || 0
+        );
+        
+        if (availableRooms.length === 0) continue;
+        
+        // Get module info to find appropriate staff
+        const moduleInfo = await Module.getById(eventData.moduleId);
+        const departmentId = moduleInfo?.departmentid;
+        
+        const availableStaff = await SchedulerService.getAvailableStaff(
+          dateStr,
+          timeslot.id,
+          departmentId
+        );
+        
+        if (availableStaff.length > 0) {
+          console.log(`Found available time slot on attempt ${attempt + 1}`);
+          return {
+            success: true,
+            date: dateStr,
+            timeslotId: timeslot.id,
+            timeslot: timeslot,
+            availableRooms,
+            availableStaff
+          };
         }
       }
       
-      // Generate minutes (0, 15, 30, 45)
-      if (Math.random() < 0.7) {
-        // 70% chance for "standard" start times
-        minute = Math.random() < 0.5 ? 0 : 30;
-      } else {
-        // 30% chance for "odd" start times
-        minute = Math.random() < 0.5 ? 15 : 45;
-      }
-      
-      // Create date objects for the start and end times
-      const tryStart = new Date();
-      // Set to next occurrence of the selected day
-      tryStart.setDate(tryStart.getDate() + (day - tryStart.getDay() + 7) % 7);
-      tryStart.setHours(hour, minute, 0, 0);
-      
-      const tryEnd = new Date(tryStart);
-      tryEnd.setMinutes(tryEnd.getMinutes() + durationMinutes);
-      
-      console.log(`Trying time slot: ${tryStart.toISOString()} - ${tryEnd.toISOString()}`);
-      
-      // Check if this time slot works
-      const availableRooms = await SchedulerService.getAvailableRooms(
-        tryStart, 
-        tryEnd, 
-        eventData.student_count || 0
-      );
-      
-      // Get module info to find appropriate staff
-      const moduleInfo = await Module.getById(eventData.moduleId);
-      const departmentId = moduleInfo?.departmentid;
-      
-      const availableStaff = await SchedulerService.getAvailableStaff(
-        tryStart, 
-        tryEnd, 
-        departmentId
-      );
-      
-      if (availableRooms.length > 0 && availableStaff.length > 0) {
-        console.log(`Found available time slot on attempt ${attempt + 1}`);
-        return {
-          success: true,
-          start: tryStart,
-          end: tryEnd,
-          availableRooms,
-          availableStaff
-        };
-      }
-      
-      console.log(`Attempt ${attempt + 1} failed, trying another time slot...`);
+      console.log(`Attempt ${attempt + 1} failed, trying another date...`);
     }
     
     console.log(`Failed to find available time slot after ${maxAttempts} attempts`);
@@ -196,10 +228,22 @@ const SchedulerService = {
    */
   scheduleEvent: async (eventData) => {
     try {
-      const { title, start, end, student_count, moduleId, preferredRoomIds = [], preferredStaffIds = [] } = eventData;
+      const { title, event_date, timeslot_id, student_count, moduleId, preferredRoomIds = [], preferredStaffIds = [] } = eventData;
       
+      const timeslot = await Timeslot.getById(timeslot_id);
+      if (!timeslot) {
+        return {
+          success: false,
+          message: 'Invalid timeslot specified'
+        };
+      }
+
       // Find available rooms
-      const availableRooms = await SchedulerService.getAvailableRooms(start, end, student_count);
+      const availableRooms = await SchedulerService.getAvailableRooms(
+        event_date,
+        timeslot_id,
+        student_count
+      );
       
       if (availableRooms.length === 0) {
         return {
@@ -224,7 +268,11 @@ const SchedulerService = {
       const departmentId = moduleInfo?.departmentId;
       
       // Find available staff
-      const availableStaff = await SchedulerService.getAvailableStaff(start, end, departmentId);
+      const availableStaff = await SchedulerService.getAvailableStaff(
+        event_date,
+        timeslot_id,
+        departmentId
+      );
       
       if (availableStaff.length === 0) {
         return {
@@ -247,8 +295,8 @@ const SchedulerService = {
       // Create the event
       const newEvent = await Event.create({
         title,
-        start_time: start,
-        end_time: end,
+        event_date,
+        timeslot_id,
         roomId: selectedRoom.id,
         staffId: selectedStaff.id,
         moduleId,
