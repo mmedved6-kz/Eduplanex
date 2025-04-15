@@ -16,11 +16,11 @@ import AutoScheduleModal from "@/app/components/AutoscheduleModal";
 type Event = {
   id: string | number;
   title: string;
-  startTime: string;
-  endTime: string;
-  startDate?: string;
-  startTimeFormatted?: string;
-  endTimeFormatted?: string;
+  eventDate: string; 
+  timeslotId: string;
+  timeslotStart: string;
+  timeslotEnd: string;
+  duration: number;
   moduleName: string;
   roomName: string;
   staffName: string;
@@ -77,7 +77,7 @@ const EventListPage = () => {
   const pageSize = 10;
   const [searchQuery, setSearchQuery] = useState('');
   const [isSortPanelOpen, setIsSortPanelOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState('event.start_time'); 
+  const [sortColumn, setSortColumn] = useState('event.event_date'); 
   const [sortOrder, setSortOrder] = useState('ASC');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
@@ -147,6 +147,22 @@ const EventListPage = () => {
     getEventData();
   };
 
+  const formatDateForDisplay = (dateStr: string) => {
+    if (!dateStr) return "N/A";
+    
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateStr;
+    }
+  };
+
   const renderEventCell = (item: Event) => (
     <div className="flex items-center gap-4 p-4">
       <div className="flex flex-col">
@@ -155,8 +171,7 @@ const EventListPage = () => {
           <EventTag tag={item.tag} />
         </div>
         <p className="text-xs text-gray-400">
-          {/* Use the pre-formatted strings from the backend */}
-          {item.startDate} • {item.startTimeFormatted} - {item.endTimeFormatted}
+          {formatDateForDisplay(item.eventDate)} • {item.timeslotStart} - {item.timeslotEnd}
         </p>
       </div>
     </div>
@@ -177,8 +192,8 @@ const EventListPage = () => {
       <td>{renderEventCell(item)}</td>
       <td className="hidden md:table-cell">{item.moduleName || "N/A"}</td>
       <td className="hidden md:table-cell">
-  {item.startDate} • {item.startTimeFormatted} - {item.endTimeFormatted}
-</td>
+        {item.timeslotStart} - {item.timeslotEnd}
+      </td>
       <td className="hidden md:table-cell">
         <EventTag tag={item.tag} />
       </td>

@@ -15,8 +15,8 @@ const schema = z.object({
     .min(3, { message: "Title must be at least 3 characters long!" })
     .max(50, { message: "Title must be at most 50 characters long!" }),
   description: z.string().optional(),
-  start: z.string().min(1, { message: "Start date and time is required!" }),
-  end: z.string().min(1, { message: "End date and time is required!" }),
+  event_date: z.string().min(1, { message: "Date is required!" }),
+  timeslot_id: z.string().min(1, { message: "Time slot is required!" }),
   course_id: z.string().min(1, { message: "Course is required!" }),
   module_id: z.string().optional(),
   room_id: z.string().min(1, { message: "Room is required!" }),
@@ -34,6 +34,13 @@ const schema = z.object({
 type Inputs = z.infer<typeof schema>;
 
 type TabType = "Event Details" | "Resources" | "Students";
+
+type Timeslot = {
+  id: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+}
 
 const generateEventId = () => {
   const prefix = 'EVT';
@@ -66,6 +73,8 @@ const EventForm = ({
   const [staff, setStaff] = useState([]);
   const [students, setStudents] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
+  const [selectedTimeslot, setSelectedTimeslot] = useState<Timeslot | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
 
   useEffect(() => {
@@ -135,6 +144,19 @@ const EventForm = ({
         } catch (studentError) {
           console.error('Error fetching students:', studentError);
         }
+
+        try {
+          const timeslotsResponse = await fetch('http://localhost:5000/api/timeslots?pageSize=100');
+          if (timeslotsResponse.ok) {
+            const timeslotsData = await timeslotsResponse.json();
+            setTimeslots(timeslotsData.items || []);
+          }
+          else {
+            console.error('Failed to fetch timeslots:', timeslotsResponse.status);
+          }
+        } catch (timeslotError) {
+          console.error('Error fetching timeslots:', timeslotError);
+        }
         
       } catch (error) {
         console.error('Error in fetchData:', error);
@@ -143,26 +165,6 @@ const EventForm = ({
 
     fetchData();
   }, []);
-
-  // Format date-time for default values
-  const formatDateTime = (dateString: string | Date | undefined): string => {
-    if (!dateString) return '';
-    
-    const date = new Date(dateString);
-    
-    // Ensure valid date
-    if (isNaN(date.getTime())) return '';
-    
-    // Format to local date-time string in the format required by datetime-local input
-    // YYYY-MM-DDThh:mm
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
 
   const {
     register,
@@ -176,17 +178,28 @@ const EventForm = ({
       id: data?.id || generateEventId(),
       title: data?.title || "",
       description: data?.description || "",
-      start: formatDateTime(data?.start) || "",
-      end: formatDateTime(data?.end) || "",
+      event_date: data?.event_date || "",
+      timeslot_id: data?.timeslot_id || "",
       course_id: data?.course_id?.toString() || "",
       module_id: data?.module_id?.toString() || "",
       room_id: data?.room_id?.toString() || "",
       staff_id: data?.staff_id?.toString() || "",
       student_count: data?.student_count?.toString() || "0",
       students: data?.students || [],
-      event_type: data?.event_type || "CLASS",
+      event_type: data?.tag || "CLASS",
     }
   });
+
+  const selectedTimeslotId = watch("timeslot_id");
+
+  useEffect(() => {
+    if (selectedTimeslotId) {
+      const timeslot = timeslots.find(t => t.id === selectedTimeslotId);
+      setSelectedTimeslot(timeslot || null);
+    } else {
+      setSelectedTimeslot(null);
+    }
+  }, [selectedTimeslotId, timeslots]);
 
   useEffect(() => {
     if (type === "update" && data) {
@@ -199,19 +212,19 @@ const EventForm = ({
       setValue("title", data.title || "");
       setValue("description", data.description || "");
       
-      // Format and set dates properly
-      if (data.startTime) {
-        setValue("start", formatDateTime(data.startTime));
+      // Set date and timeslot
+      if (data.event_date) {
+        setValue("event_date", data.event_date);
       }
-      if (data.endTime) {
-        setValue("end", formatDateTime(data.endTime));
+      if (data.timeslot_id) {
+        setValue("timeslot_id", data.timeslot_id);
       }
       
       // Set resources
-      if (data.courseId) setValue("course_id", data.courseId);
-      if (data.moduleId) setValue("module_id", data.moduleId);
-      if (data.roomId) setValue("room_id", data.roomId);
-      if (data.staffId) setValue("staff_id", data.staffId);
+      if (data.courseId || data.course_id) setValue("course_id", data.courseId || data.course_id);
+      if (data.moduleId || data.module_id) setValue("module_id", data.moduleId || data.module_id);
+      if (data.roomId || data.room_id) setValue("room_id", data.roomId || data.room_id);
+      if (data.staffId || data.staff_id) setValue("staff_id", data.staffId || data.staff_id);
       
       // Set event type
       if (data.tag) setValue("event_type", data.tag);
@@ -274,22 +287,38 @@ const EventForm = ({
     setValue("students", selectedStudents);
   }, [selectedStudents, setValue]);
 
+  const formatTimeForDisplay = (timeString: string) => {
+    if (!timeString) return "";
+
+    try {
+      const [hours, minutes] = timeString.split(":").map(Number);
+
+      const date = new Date();
+      date.setHours(hours, minutes, 0);
+
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return timeString;
+    }
+  }
+
   const onSubmit = async (formData: Inputs) => {
     console.log("Form submitted with data:", formData);
     setLoading(true);
     setError("");
 
     try {
-      const startDate = new Date(formData.start);
-      const endDate = new Date(formData.end);
-
-      // Convert dates to proper format and prepare data
       const processedData = {
         id: formData.id,  
         title: formData.title,
         description: formData.description || "",
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
+        event_date: formData.event_date,
+        timeslot_id: formData.timeslot_id,
         courseId: formData.course_id,
         moduleId: formData.module_id || null,
         roomId: formData.room_id,
@@ -309,16 +338,19 @@ const EventForm = ({
       });
 
       if (!constraintsResponse.ok) {
-        throw new Error("Failed to check constraints");
+        const errorData = await constraintsResponse.json();
+        console.error("Constraint check failed:", errorData);
+        throw new Error(errorData.error || "Failed to check constraints");
       }
 
       const constraintsResults = await constraintsResponse.json();
+      console.log("Constraint check results:", constraintsResults);
 
       setPendingEvent(processedData);
       setHardViolations(constraintsResults.hardViolations || []);
-      setSoftViolations(constraintsResults.softViolations || []);
+      setSoftViolations(constraintsResults.softWarnings || []);
 
-      if (constraintsResults.hardViolations.length > 0 || constraintsResults.softViolations.length > 0) {
+      if (constraintsResults.hardViolations.length > 0 || constraintsResults.softWarnings.length > 0) {
         setShowViolationPanel(true);
         setLoading(false);
         return;
@@ -421,6 +453,7 @@ const EventForm = ({
                   type="text"
                   {...register("id")}
                   className="border border-gray-300 p-2 rounded-md text-sm w-full bg-gray-100 cursor-not-allowed"
+                  readOnly
                 />
                 {errors.id?.message && (
                   <p className="text-xs text-red-500 mt-1">{errors.id.message}</p>
@@ -457,32 +490,59 @@ const EventForm = ({
                 )}
               </div>
 
-              {/* Date and Time Inputs */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Date and Timeslot Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-sm text-gray-600">Start Date & Time</label>
+                  <label className="text-sm text-gray-600">Date</label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     className="border border-gray-300 p-2 rounded-md text-sm w-full"
-                    {...register("start")}
+                    {...register("event_date")}
                   />
-                  {errors.start?.message && (
-                    <p className="text-xs text-red-500 mt-1">{errors.start.message}</p>
+                  {errors.event_date?.message && (
+                    <p className="text-xs text-red-500 mt-1">{errors.event_date.message}</p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-sm text-gray-600">End Date & Time</label>
-                  <input
-                    type="datetime-local"
+                  <label className="text-sm text-gray-600">Time</label>
+                  <select
                     className="border border-gray-300 p-2 rounded-md text-sm w-full"
-                    {...register("end")}
-                  />
-                  {errors.end?.message && (
-                    <p className="text-xs text-red-500 mt-1">{errors.end.message}</p>
+                    {...register("timeslot_id")}
+                  >
+                    <option value="">Select a Timeslot</option>
+                    {timeslots.map((timeslot) => (
+                      <option key={timeslot.id} value={timeslot.id}>
+                        {formatTimeForDisplay(timeslot.start_time)} - {formatTimeForDisplay(timeslot.end_time)} ({timeslot.duration_minutes} min)
+                      </option>
+                    ))}
+                  </select>
+                  {errors.timeslot_id?.message && (
+                    <p className="text-xs text-red-500 mt-1">{errors.timeslot_id.message}</p>
                   )}
                 </div>
               </div>
+
+              {/* Timeslot Details (if selected) */}
+              {selectedTimeslot && (
+                <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+                  <h3 className="text-sm font-medium text-blue-800 mb-2">Selected Timeslot Details</h3>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">Start Time:</span>
+                      <p>{formatTimeForDisplay(selectedTimeslot.start_time)}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">End Time:</span>
+                      <p>{formatTimeForDisplay(selectedTimeslot.end_time)}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Duration:</span>
+                      <p>{selectedTimeslot.duration_minutes} minutes</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="flex flex-col gap-1">

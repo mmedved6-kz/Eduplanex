@@ -1,4 +1,4 @@
-const Constraint = require('../models/constraintModel');
+const { Constraint } = require('../models/constraintModel');
 
 
 const checkConstraints = async (req, res) => {
@@ -18,10 +18,10 @@ const checkConstraints = async (req, res) => {
       });
     }
     
-    if ((!eventToCheck.start && !eventToCheck.start_time) || 
-        (!eventToCheck.end && !eventToCheck.end_time)) {
+    if ((!eventToCheck.event_date && !eventToCheck.eventDate) || 
+        (!eventToCheck.timeslot_id && !eventToCheck.timeslotId)) {
       return res.status(400).json({
-        error: 'Start and end times are required'
+        error: 'Event date and timeslot ID are required'
       });
     }
     
@@ -32,8 +32,8 @@ const checkConstraints = async (req, res) => {
       staffId: eventToCheck.staffId || eventToCheck.staff_id,
       moduleId: eventToCheck.moduleId || eventToCheck.module_id,
       student_count: eventToCheck.student_count || eventToCheck.student_count || 0,
-      start: eventToCheck.start || eventToCheck.start_time,
-      end: eventToCheck.end || eventToCheck.end_time
+      event_date: eventToCheck.event_date || eventToCheck.eventDate,
+      timeslot_id: eventToCheck.timeslot_id || eventToCheck.timeslotId
     };
     
     const result = await Constraint.validateEvent(event);
