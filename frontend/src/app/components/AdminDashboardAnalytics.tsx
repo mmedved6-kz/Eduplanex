@@ -12,6 +12,7 @@ const DashboardStats = () => {
     constraintSatisfaction: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -20,25 +21,30 @@ const DashboardStats = () => {
         const response = await fetch('http://localhost:5000/api/stats/dashboard');
         
         if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+          const errorText = await response.text();
+          throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText}`);
         }
         
         const data = await response.json();
+        console.log("Dashboard stats response:", data); // Debug log
+        
+        if (!data || 
+            typeof data.roomUtilization === 'undefined' || 
+            typeof data.staffWorkload === 'undefined' || 
+            typeof data.scheduledEvents === 'undefined' || 
+            typeof data.constraintSatisfaction === 'undefined') {
+          throw new Error('Invalid response format: missing expected statistics');
+        }
+
         setStats({
-          roomUtilization: data.roomUtilization || 0,
-          staffWorkload: data.staffWorkload || 0,
-          scheduledEvents: data.scheduledEvents || 0,
-          constraintSatisfaction: data.constraintSatisfaction || 0
+          roomUtilization: data.roomUtilization,
+          staffWorkload: data.staffWorkload,
+          scheduledEvents: data.scheduledEvents,
+          constraintSatisfaction: data.constraintSatisfaction
         });
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
-        // Use fallback values if the API call fails
-        setStats({
-          roomUtilization: 78,
-          staffWorkload: 16,
-          scheduledEvents: 42,
-          constraintSatisfaction: 94
-        });
+        setError(`Failed to load dashboard statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setLoading(false);
       }
@@ -59,6 +65,21 @@ const DashboardStats = () => {
             <div className="h-8 bg-gray-200 rounded w-1/2"></div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 p-4 rounded-lg text-red-800 text-sm mb-4">
+        <p className="font-medium mb-1">Error loading dashboard statistics</p>
+        <p>{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-2 text-blue-600 hover:text-blue-800 text-sm underline"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -105,7 +126,7 @@ const DashboardStats = () => {
         </div>
       </div>
 
-      {/* Scheduled Events - Fixed to match the design of other stats */}
+      {/* Scheduled Events */}
       <div className="bg-white p-4 rounded-lg shadow flex items-center">
         <div className="w-16 h-16 mr-4">
           <CircularProgressbar
@@ -115,7 +136,6 @@ const DashboardStats = () => {
               textSize: "24px",
               pathColor: "#4aa8ff",
               textColor: "#4aa8ff",
-              // Only show the number without percentage sign
             })}
           />
         </div>

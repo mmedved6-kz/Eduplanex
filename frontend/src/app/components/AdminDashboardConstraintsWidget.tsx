@@ -30,7 +30,19 @@ const ConstraintViolationsWidget = () => {
         }
         
         const data = await response.json();
-        setViolations(data.violations || []);
+        console.log("Constraint violations response:", data);
+
+        if (data && Array.isArray(data.violations)) {
+          setViolations(data.violations);
+        } else {
+          const extractedViolations = data?.violations || data?.items || (Array.isArray(data) ? data : []);
+          setViolations(extractedViolations);
+          
+          if (extractedViolations.length === 0) {
+            console.warn("No violations found in response:", data);
+            setError("No constraint violations found in response");
+          }
+        }
       } catch (error) {
         console.error('Error fetching constraint violations:', error);
         setError('Failed to load constraint data. Please try again later.');
@@ -62,7 +74,6 @@ const ConstraintViolationsWidget = () => {
       <div className = "flex-grow flex items-center justify-center">
         <div className="text-center p-4">
           <div className="text-red-500 mb-2">
-            // CHANGE SVG TO NEW ICONS ONCE I UPLOAD
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

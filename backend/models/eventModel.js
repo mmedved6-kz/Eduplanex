@@ -190,23 +190,30 @@ const Event = {
   getCalendarEvents: async () => {
     try {
       const events = await db.any(`
-        SELECT 
-          event.*,
-          ts.start_time as timeslot_start,
-          ts.end_time as timeslot_end,
-          m.name AS modulename,
-          r.name AS roomname,
-          s.name AS staffname,
-          c.name AS coursename
-        FROM Event event
-        LEFT JOIN Module m ON event.moduleId = m.id
-        LEFT JOIN Room r ON event.roomId = r.id
-        LEFT JOIN Staff s ON event.staffId = s.id
-        LEFT JOIN Course c ON event.courseId = c.id
-        WHERE event.start_time >= CURRENT_DATE
-        ORDER BY event.start_time ASC
-        LIMIT 100
-      `);
+        SELECT
+            e.id,
+            e.title,
+            e.event_date,
+            e.tag,
+            e.roomid,      -- Select original roomid
+            e.staffid,     -- Select original staffid
+            e.moduleid,    -- Select original moduleid
+            e.courseid,    -- Select original courseid
+            e.timeslot_id, -- <<< ADD THIS LINE >>>
+            ts.start_time as timeslot_start,
+            ts.end_time as timeslot_end,
+            m.name AS modulename,
+            c.name AS coursename,
+            r.name AS roomname,
+            s.name AS staffname
+        FROM Event e
+        LEFT JOIN timeslot ts ON e.timeslot_id = ts.id
+        LEFT JOIN Module m ON e.moduleId = m.id
+        LEFT JOIN Room r ON e.roomId = r.id
+        LEFT JOIN Staff s ON e.staffId = s.id
+        LEFT JOIN Course c ON e.courseId = c.id
+        ORDER BY e.event_date, ts.start_time;
+    `);
       
       // Convert to standard format
       return events.map(event => ({

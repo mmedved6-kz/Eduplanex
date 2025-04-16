@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import 'react-calendar/dist/Calendar.css';
 import Image from 'next/image';
+import Link from "next/link";
 
 type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
@@ -20,7 +21,7 @@ const formatDate = (date: Date) => {
     return date.toISOString().split("T")[0];  // "YYYY-MM-DD"
 };
 
-const ClassCalendar = () => {
+const EventCalendar = () => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [events, setEvents] = useState<Event[]>([]);
     const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
@@ -38,73 +39,59 @@ const ClassCalendar = () => {
               const response = await fetch('http://localhost:5000/api/events/calendar');
               
               if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText}`);
               }
               
               const data = await response.json();
-              // Transform API data to the format needed by the calendar
+              console.log("Calendar events response:", data);
+              
+              let formattedEvents: Event[] = [];
+
               if (data.items && Array.isArray(data.items)) {
-                const formattedEvents = data.items.map((event: any) => ({
-                  id: event.id,
-                  title: event.title,
-                  date: new Date(event.startTime || event.start_time),
-                  time: `${new Date(event.startTime || event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-                         ${new Date(event.endTime || event.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-                  description: event.description || "No description available"
-                }));
-                setEvents(formattedEvents);
-                
-                // Filter events for selected date (or today if none selected)
-                const currentDate = selectedDate || new Date();
-                const filteredEvents = formattedEvents.filter((event: Event) => 
-                  formatDate(event.date) === formatDate(currentDate)
-                );
-                setFilteredEvents(filteredEvents);
-              } else {
-                throw new Error('Invalid response format');
+                formattedEvents = data.items.map((event: any) => {
+                  let eventDate: Date;
+                  let timeRange: string;
+                  
+                  if (event.eventDate || event.event_date) {
+                    eventDate = new Date(event.eventDate || event.event_date);
+                    timeRange = `${event.timeslotStart || event.start_time || ''} - ${event.timeslotEnd || event.end_time || ''}`;
+                  } else {
+                    const startTime = new Date(event.startTime || event.start_time || event.start);
+                    const endTime = new Date(event.endTime || event.end_time || event.end);
+                    eventDate = startTime;
+                    timeRange = `${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                              ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                  }
+                  
+                  return {
+                    id: event.id,
+                    title: event.title,
+                    date: eventDate,
+                    time: timeRange,
+                    description: event.description || "No description available"
+                  };
+                });
               }
-            } catch (error) {
-              console.error('Error fetching events:', error);
-              
-              // Use hard-coded test events as fallback
-              const testEvents = [
-                {
-                  id: 1,
-                  title: "Test class 1", 
-                  date: new Date(2025, 3, 10),
-                  time: "10:00 AM - 11:00 AM",
-                  description: "This is a test class",
-                },
-                {
-                  id: 2,
-                  title: "Test class 2",
-                  date: new Date(2025, 3, 11),
-                  time: "11:00 AM - 12:00 PM",
-                  description: "This is a test class",
-                },
-                {
-                  id: 3,
-                  title: "Today's Class",
-                  date: new Date(), // Today
-                  time: "2:00 PM - 3:00 PM",
-                  description: "This class is scheduled for today",
-                }
-              ];
-              setEvents(testEvents);
-              
-              // Filter for selected date
+
+              setEvents(formattedEvents);
+                
+              // Filter events for selected date (or today if none selected)
               const currentDate = selectedDate || new Date();
-              const filteredEvents = testEvents.filter(event => 
+              const filteredEvents = formattedEvents.filter((event: Event) => 
                 formatDate(event.date) === formatDate(currentDate)
               );
               setFilteredEvents(filteredEvents);
+            } catch (error) {
+              console.error('Error fetching events:', error);
+              setError(`Failed to fetch calendar events: ${error instanceof Error ? error.message : 'Unknown error'}`);
             } finally {
               setLoading(false);
             }
           };
         fetchEvents();
     }, []);
-
+    
     // Handle date change and filter events
     const handleDateChange = (value: Value) => {
         if (value instanceof Date) {
@@ -121,6 +108,10 @@ const ClassCalendar = () => {
         return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
+    const displayedEvents = filteredEvents.slice(0, 2);
+    const hasMoreEvents = filteredEvents.length > 2;
+    const additionalEventsCount = filteredEvents.length - 2;
+
     return (
         <div className="bg-white p-5 rounded-md h-full flex flex-col shadow">
             <Calendar
@@ -136,32 +127,40 @@ const ClassCalendar = () => {
                 }
             />
             <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold my-4">Events</h1>
-                <Image src="/exam.png" alt="Events Icon" width={20} height={20} />
+                <h1 className="text-lg font-semibold my-2">Events</h1>
+                <Link href="/dashboard/list/event">
+                    <Image src="/exam.png" alt="Events Icon" width={18} height={18}  className="cursor-pointer hover:opacity-80" />
+                </Link>
             </div>
             <div className="flex-grow overflow-y-auto">
                 {loading ? (
-                    <div className="flex justify-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
+                    <div className="flex justify-center py-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
                     </div>
                 ) : error ? (
-                    <div className="text-center py-4 text-red-500">{error}</div>
+                    <div className="text-center py-3 text-red-500">{error}</div>
                 ) : (
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                         {filteredEvents.length > 0 ? (
-                            filteredEvents.map((event) => (
-                                <div
-                                    key={event.id}
-                                    className="p-3 border rounded-lg bg-blue-100 border-blue-400 hover:bg-blue-200 transition-colors"
-                                >
-                                    <h2 className="font-semibold text-gray-700">{event.title}</h2>
-                                    <p className="text-sm">{event.time}</p>
-                                    <p className="text-sm text-gray-500">{event.description}</p>
-                                </div>
-                            ))
+                            <>
+                                {displayedEvents.map((event) => (
+                                    <div key={event.id} className="p-2 border rounded-lg bg-blue-100 border-blue-400 hover:bg-blue-200 transition-colors">
+                                        <h2 className="font-semibold text-gray-700 text-sm">{event.title}</h2>
+                                        <p className="text-xs">{event.time}</p>
+                                        <p className="text-xs text-gray-500">{event.description}</p>
+                                    </div>
+                                ))}
+                                {hasMoreEvents && (
+                                    <Link href="/dashboard/list/event">
+                                        <div className="text-center p-1 text-blue-500 hover:text-blue-700 cursor-pointer">
+                                        View all {filteredEvents.length} events
+                                        </div>
+                                    </Link>
+                                )}
+                            </>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-2" />
+                            <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-1" />
                                 <p className="text-sm text-gray-400">No events for this date.</p>
                             </div>
                         )}
@@ -172,4 +171,4 @@ const ClassCalendar = () => {
     );
 };
 
-export default ClassCalendar;
+export default EventCalendar;

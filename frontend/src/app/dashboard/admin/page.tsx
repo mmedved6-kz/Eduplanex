@@ -12,8 +12,8 @@ import Link from "next/link";
 const AdminPage = () => {
   return (
     <RequireAuth allowedRoles={["admin"]}>
-      <div className="p-4 flex flex-col gap-6 h-full">
-        <h1 className="text-2xl font-bold mb-4">Dashboard Overview</h1>
+      <div className="p-4 flex flex-col gap-3 h-full">
+        <h1 className="text-2xl font-bold mb-1">Dashboard Overview</h1>
         
         {/* Main Content Area - 2 Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">

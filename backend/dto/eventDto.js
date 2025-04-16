@@ -2,34 +2,22 @@ class EventDto {
     constructor(event) {
         this.id = event.id;
         this.title = event.title;
-        this.description = event.description;
         this.eventDate = event.event_date;
-        
-        this.timeslotId = event.timeslot_id;
-        this.timeslotStart = event.timeslot_start;
-        this.timeslotEnd = event.timeslot_end;
-        this.duration = event.duration_minutes;
-        
-        this.startTime = event.start_time ? 
-            this.formatTimeOnly(event.start_time) : null;
-        this.endTime = event.end_time ? 
-            this.formatTimeOnly(event.end_time) : null;
-        
-        this.date = this.eventDate ? 
-            new Date(this.eventDate).toLocaleDateString() : "N/A";
-        this.timeRange = (this.timeslotStart && this.timeslotEnd) ? 
-            `${this.timeslotStart} - ${this.timeslotEnd}` : "N/A";
-        
+        this.startTime = event.timeslot_start; // Use alias from query
+        this.endTime = event.timeslot_end;     // Use alias from query
         this.tag = event.tag;
-        this.moduleId = event.moduleid;
-        this.moduleName = event.modulename || "N/A";
+        this.moduleName = event.modulename;
+        this.courseName = event.coursename;
+        this.roomName = event.roomname;
+        this.staffName = event.staffname;
+        this.description = event.description; // Assuming description exists in event table
+        // <<< ADD THIS LINE >>>
+        this.timeslotId = event.timeslot_id; // Map the timeslot_id from the query result
+        // Add original IDs if needed by frontend logic (like constraint checking)
         this.roomId = event.roomid;
-        this.roomName = event.roomname || "N/A";
         this.staffId = event.staffid;
-        this.staffName = event.staffname || "N/A";
+        this.moduleId = event.moduleid;
         this.courseId = event.courseid;
-        this.courseName = event.coursename || "N/A";
-        this.student_count = event.student_count || 0;
     }
 
     formatTimeOnly(datetimeStr) {

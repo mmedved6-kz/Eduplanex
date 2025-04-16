@@ -23,18 +23,25 @@ const ActionItemsWidget = () => {
     const fetchActionItems = async () => {
       try {
         setLoading(true);
-        // Real API endpoint
         const response = await fetch('http://localhost:5000/api/actions');
         
         if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+          const errorText = await response.text();
+          throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText}`);
         }
         
         const data = await response.json();
-        setActionItems(data.items || []);
+        console.log("Action items response:", data);
+        
+        if (data && Array.isArray(data.items)) {
+          setActionItems(data.items);
+        } else {
+          throw new Error('Invalid response format: missing items array');
+        }
       } catch (error) {
         console.error('Error fetching action items:', error);
-        setError('Failed to load action items');
+        setError(`Failed to load action items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setActionItems([]);
       } finally {
         setLoading(false);
       }
@@ -54,7 +61,6 @@ const ActionItemsWidget = () => {
     switch (type) {
       case 'conflict':
         return (
-          // CHANGE SVG TO IMAGE ONCE UPLOAD NEW ICONS
           <div className="rounded-full bg-red-100 p-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -117,12 +123,12 @@ const ActionItemsWidget = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-5 h-full flex flex-col">
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-lg font-semibold">Action Items</h2>
-      <Link href="/dashboard/actions" className="text-sm text-blue-500 hover:text-blue-700">
-        View All
-      </Link>
-    </div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Action Items</h2>
+        <Link href="/dashboard/actions" className="text-sm text-blue-500 hover:text-blue-700">
+          View All
+        </Link>
+      </div>
 
       <div className="flex border-b mb-4">
         <button
@@ -158,10 +164,23 @@ const ActionItemsWidget = () => {
       </div>
       
       {loading ? (
-      <div className="flex justify-center py-8">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    ) : (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : error ? (
+        <div className="flex-grow flex items-center justify-center">
+          <div className="text-center p-4">
+            <div className="text-red-500 mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-gray-600">{error}</p>
+            <div className="text-xs text-gray-500 mt-2">Check console for details</div>
+            <button onClick={() => window.location.reload()} className="mt-2 text-sm text-blue-500 hover:text-blue-700">Try Again</button>
+          </div>
+        </div>
+      ) : (
         <div className="flex-grow overflow-y-auto">
           {filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">

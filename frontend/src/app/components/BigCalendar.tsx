@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, momentLocalizer, View, Views, SlotInfo } from 'react-big-calendar';
+import { Calendar, momentLocalizer, View, Views, SlotInfo, EventProps } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import moment from 'moment';
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -24,6 +24,7 @@ interface CalendarEvent {
   tag?: string;
   hasConstraintWarnings?: boolean;
   hasConstraintViolations?: boolean;
+  timeslot_id?: string;
 }
 
 // Use type assertion to help TypeScript understand the DnD wrapper
@@ -42,7 +43,7 @@ const BigCalendar = () => {
         try {
             console.log('Starting to fetch events...');
             
-            const response = await fetch('/api/events');
+            const response = await fetch('http://localhost:5000/api/events/calendar');
             
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -51,19 +52,27 @@ const BigCalendar = () => {
             const data = await response.json();
             console.log('Fetched data:', data);
             
-            // Check if data has the expected structure
-            if (!data || !data.items || !Array.isArray(data.items)) {
-                console.error('Unexpected data format - missing items array');
-                return;
-            }
+            const eventsArray = Array.isArray(data) ? data : (data.items || []);
             
-            // Process normal response with items array
-            const formattedEvents = data.items
+            // Process events array
+            const formattedEvents = eventsArray
                 .map((event: any) => {
                     try {
-                        // Handle date parsing safely
-                        const start = new Date(event.startTime || event.start_time || event.start);
-                        const end = new Date(event.endTime || event.end_time || event.end);
+                        let start, end;
+                        
+                        // Change to match the camelCase property names from backend
+                        if (event.startTime && event.endTime) {
+                            const datePart = event.eventDate?.split('T')[0] || event.event_date;
+                            start = new Date(`${datePart}T${event.startTime}`);
+                            end = new Date(`${datePart}T${event.endTime}`);
+                            
+                            // Add debugging
+                            console.log(`Successfully parsed dates for ${event.title}:`, 
+                                {datePart, startTime: event.startTime, endTime: event.endTime, start, end});
+                        } else {
+                            console.error('Event missing timeslot data:', event);
+                            return null;
+                        }
                         
                         if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                             console.error('Invalid date for event:', event);
@@ -75,35 +84,25 @@ const BigCalendar = () => {
                             title: event.title,
                             start,
                             end,
-                            room_id: event.roomId,
-                            staff_id: event.staffId,
-                            course_id: event.moduleId,
+                            room_id: event.room_id || event.roomId, // Also handle potential camelCase for room_id
+                            staff_id: event.staff_id || event.staffId, // Also handle potential camelCase for staff_id
+                            course_id: event.course_id || event.module_id || event.moduleId, // Handle variations
                             student_count: event.student_count || 0,
-                            tag: event.tag
+                            tag: event.tag || 'CLASS',
+                            // Use the camelCase name from the backend DTO
+                            timeslot_id: event.timeslotId // <-- CHANGE THIS LINE
                         };
                     } catch (error) {
                         console.error('Error processing event:', event, error);
                         return null;
                     }
                 })
-                .filter((event: unknown): event is CalendarEvent => event !== null); // Type guard
+                .filter((event: unknown): event is CalendarEvent => event !== null);
             
             console.log('Formatted events for calendar:', formattedEvents);
             setEvents(formattedEvents);
         } catch (error) {
             console.error('Error fetching events:', error);
-            
-            // Use test events as fallback
-            const testEvents: CalendarEvent[] = [
-                {
-                    id: '1',
-                    title: 'Today Event',
-                    start: new Date(),
-                    end: new Date(new Date().getTime() + 2 * 60 * 60 * 1000),
-                    tag: 'EVENT'
-                }
-            ];
-            setEvents(testEvents);
         }
     }, []);
 
@@ -125,56 +124,46 @@ const BigCalendar = () => {
     };
 
     useEffect(() => {
-        // Temporary test data
-        const testEvents: CalendarEvent[] = [
-            {
-                id: '1',
-                title: 'Test Event 1',
-                start: new Date(2025, 3, 5, 10, 0), // April 5, 2025, 10:00 AM
-                end: new Date(2025, 3, 5, 12, 0),   // April 5, 2025, 12:00 PM
-                tag: 'CLASS'
-            },
-            {
-                id: '2',
-                title: 'Test Event 2',
-                start: new Date(2025, 3, 6, 14, 0), // April 6, 2025, 2:00 PM
-                end: new Date(2025, 3, 6, 16, 0),   // April 6, 2025, 4:00 PM
-                tag: 'EXAM'
-            },
-            {
-                id: '3',
-                title: 'Today Event',
-                start: new Date(), // Now
-                end: new Date(new Date().getTime() + 2 * 60 * 60 * 1000), // 2 hours from now
-                tag: 'EVENT'
-            }
-        ];
-        
-        setEvents(testEvents);
-        
-        // Comment out the API fetch for now
-        // fetchEvents();
-    }, []);
+        fetchEvents();
+    }, [fetchEvents]);
 
     const checkConstraints = async (event: CalendarEvent) => {
         try {
-            const response = await fetch('/api/constraints/check', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(event),
+            const eventDate = event.start.toISOString().split('T')[0];
+            const timeslotId = event.timeslot_id || "TS1"; // Add fallback here
+
+            console.log('Checking constraints with:', {
+                event_date: eventDate,
+                timeslot_id: timeslotId, // Use the variable with fallback
+                // ... other properties
             });
+
+            const response = await fetch('http://localhost:5000/api/constraints/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...event,
+                    event_date: eventDate,
+                    timeslot_id: timeslotId, // Use the variable with fallback
+                    // ... other properties
+                }),
+            });
+            // ... rest of function
+            // Get the response text regardless of status
+            const responseText = await response.text();
+            console.log('Constraint check response:', response.status, responseText);
             
             if (!response.ok) {
-                throw new Error('Failed to check constraints');
+                throw new Error(`Failed to check constraints: ${response.status} ${responseText}`);
             }
             
-            const result = await response.json();
+            // Parse the response as JSON after confirming it's ok
+            const result = JSON.parse(responseText);
             return result;
         } catch (error) {
             console.error('Error checking constraints:', error);
-            return { hardViolations: [], softWarnings: [] };
+            // Rethrow the error so it can be handled by the caller
+            throw error;
         }
     };
 
@@ -212,10 +201,32 @@ const BigCalendar = () => {
     
     const saveEvent = async (event: CalendarEvent) => {
         try {
-            await fetch('/api/events', {
+            // Log event before formatting for API
+            console.log("Event before API formatting:", event);
+
+            const apiEvent = {
+                id: event.id,
+                title: event.title,
+                event_date: event.start.toISOString().split('T')[0],
+                timeslot_id: event.timeslot_id || "1", 
+                start_time: event.start.toISOString(),
+                end_time: event.end.toISOString(),
+                // Use consistent property naming: either all camelCase or all snake_case
+                // Backend seems to expect snake_case based on error messages
+                room_id: event.room_id || "1",
+                staff_id: event.staff_id || "1",
+                module_id: event.course_id || "1",
+                student_count: event.student_count || 0,
+                tag: event.tag || 'CLASS'
+            };
+
+            // Log formatted API event
+            console.log("Formatted API event:", apiEvent);
+
+            await fetch('http://localhost:5000/api/events', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(event)
+                body: JSON.stringify(apiEvent)
             });
             
             // For now, manually update events array
@@ -243,17 +254,44 @@ const BigCalendar = () => {
     const moveEvent = useCallback((eventData: any) => {
         const { event, start, end } = eventData;
         
-        const updatedEvent = { 
-            ...event, 
-            start: new Date(start), 
-            end: new Date(end) 
-        };
+        // Find the original event with all properties from your events array
+        const originalEvent = events.find(e => e.id === event.id);
+        
+        if (!originalEvent) {
+            toast.error("Could not find original event data");
+            return;
+        }
+        
+        // Log the original event AND specifically its timeslot_id
+        console.log("Original event found:", originalEvent);
+        console.log("Original event timeslot_id:", originalEvent.timeslot_id); // <-- ADD THIS LOG
+        
+        // Create updated event by merging original event with new start/end times
+        // AND ensure the required fields have default values if missing
+        const updatedEvent = {
+            ...originalEvent,
+            start: new Date(start),
+            end: new Date(end),
+            room_id: originalEvent.room_id || "1",
+            staff_id: originalEvent.staff_id || "1",
+            course_id: originalEvent.course_id || "1",
+            timeslot_id: originalEvent.timeslot_id // Explicitly add it
+        };  
+        
+        // Log the merged event AND specifically its timeslot_id
+        console.log("Updated event before checkConstraints:", updatedEvent);
+        console.log("Updated event timeslot_id:", updatedEvent.timeslot_id); // <-- ADD THIS LOG
+        
+        toast.info("Checking constraints...");
         
         checkConstraints(updatedEvent)
             .then(result => {
                 const violations = result.hardViolations || [];
+                const warnings = result.softWarnings || [];
                 
-                if (violations.some((v: any) => v.severity === 'HARD')) {
+                console.log('Constraint check result:', { violations, warnings });
+                
+                if (violations.length > 0) {
                     toast.error("Cannot move event due to hard constraints");
                     // Refresh to original position
                     setEvents([...events]); 
@@ -262,8 +300,10 @@ const BigCalendar = () => {
                         prev.map(ev => ev.id === event.id ? updatedEvent : ev)
                     );
                     
-                    if (violations.length > 0) {
+                    if (warnings.length > 0) {
                         toast.warning("Soft constraints violated");
+                    } else {
+                        toast.success("Event moved successfully");
                     }
                     
                     saveEvent(updatedEvent);
@@ -271,49 +311,67 @@ const BigCalendar = () => {
             })
             .catch(error => {
                 console.error('Error checking constraints:', error);
-                toast.error('Failed to check constraints');
+                toast.error(`Failed to check constraints: ${error.message}`);
+                // Reset the event to its original position
+                setEvents([...events]);
             });
     }, [events]);
 
     const eventStyleGetter = (event: CalendarEvent) => {
         const style: React.CSSProperties = {
             backgroundColor: '#3174ad',
-            borderRadius: '4px',
-            opacity: 0.8,
+            borderRadius: '6px',
+            opacity: 0.85,
             color: 'white',
-            border: '0px',
-            display: 'block'
-          }; // default blue
-        
-          if (event.tag) {
-            switch (event.tag.toUpperCase()) {
-              case 'CLASS':
-                style.backgroundColor = '#4285F4'; // blue
-                break;
-              case 'EXAM':
-                style.backgroundColor = '#EA4335'; // red
-                break;
-              case 'MEETING':
-                style.backgroundColor = '#FBBC05'; // yellow
-                break;
-              case 'EVENT':
-                style.backgroundColor = '#34A853'; // green
-                break;
-            }
-          }
-
-          if (event.hasConstraintWarnings) {
-            style.borderLeft = '4px solid #F9A825'; 
-          }
-          
-          if (event.hasConstraintViolations) {
-            style.borderLeft = '4px solid #D32F2F'; 
-          }
-        
-        return {
-            style
+            border: '1px solid rgba(0,0,0,0.2)',
+            display: 'block',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2)',
+            marginRight: '2px',
+            marginLeft: '2px',
+            fontWeight: 500,
         };
+        
+        if (event.tag) {
+            switch (event.tag.toUpperCase()) {
+                case 'CLASS':
+                    style.backgroundColor = '#4285F4';
+                    style.borderLeft = '3px solid #1a73e8';
+                    break;
+                case 'EXAM':
+                    style.backgroundColor = '#EA4335';
+                    style.borderLeft = '3px solid #d93025';
+                    break;
+                case 'MEETING':
+                    style.backgroundColor = '#FBBC05';
+                    style.color = 'black';
+                    style.borderLeft = '3px solid #f29900';
+                    break;
+                case 'EVENT':
+                    style.backgroundColor = '#34A853';
+                    style.borderLeft = '3px solid #1e8e3e';
+                    break;
+            }
+        }
+    
+        if (event.hasConstraintWarnings) {
+            style.borderLeft = '4px solid #F9A825';
+        }
+        
+        if (event.hasConstraintViolations) {
+            style.borderLeft = '4px solid #D32F2F';
+        }
+        
+        return { style };
     };
+
+    const EventComponent = ({ event }: EventProps<CalendarEvent>) => {
+        return (
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="text-xs font-semibold mb-1 truncate">{event.title}</div>
+            {event.room_id && <div className="text-xs opacity-80 truncate">Room: {event.room_id}</div>}
+          </div>
+        );
+      };
 
     return (
         <div className='relative'>
@@ -363,6 +421,10 @@ const BigCalendar = () => {
                 resizable
                 onEventResize={moveEvent}
                 eventPropGetter={eventStyleGetter}
+                components={{
+                    event: EventComponent
+                }}
+                dayLayoutAlgorithm="no-overlap"
             />
 
             {showViolationPanel && (

@@ -210,8 +210,10 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
       // Prepare events with preferences
       const eventsToSchedule = events.map(event => ({
         ...event,
+        student_count: selectedStudents[events.indexOf(event)]?.length || event.student_count || 0,
         preferredRoomIds: event.roomId ? [event.roomId] : [],
-        preferredStaffIds: event.staffId ? [event.staffId] : []
+        preferredStaffIds: event.staffId ? [event.staffId] : [],
+        students: selectedStudents[events.indexOf(event)] || []
       }));
       
       const response = await fetch('http://localhost:5000/api/scheduler/batch', {

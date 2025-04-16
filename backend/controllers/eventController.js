@@ -136,8 +136,8 @@ const deleteEvent = async (req, res) => {
 
 const getCalendarEvents = async (req, res) => {
   try {
-    const eventDtos = await Event.getCalendarEvents();
-    res.json({ items: eventDtos });
+    const events = await Event.getCalendarEvents();
+    return res.json({ items: events });
   } catch (error) {
     console.error('Error fetching calendar events:', error);
     res.status(500).json({ error: 'Failed to fetch calendar events' });
