@@ -5,7 +5,7 @@ import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import moment from 'moment';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import ConstraintViolationPanel from './ConstraintViolationPanel';
 
@@ -27,17 +27,103 @@ interface CalendarEvent {
   timeslot_id?: string;
 }
 
+// Props for the BigCalendar component
+interface BigCalendarProps {
+  hideToolbar?: boolean;
+  date?: Date;
+  view?: string;
+  onNavigate?: (date: Date) => void;
+  onView?: (view: string) => void;
+  showCurrentTimeIndicator?: boolean;
+  showDayHeaders?: boolean;
+  timeLabelsColor?: string;
+}
+
+// Custom time gutter header component for styled time labels
+const TimeGutterHeader = ({ timeLabelsColor }: { timeLabelsColor: string }) => {
+  return <div className={`${timeLabelsColor}`}>Time</div>;
+};
+
+// Custom time gutter slot component for styled time labels
+const TimeGutterCell = ({ value, timeLabelsColor }: { value: string; timeLabelsColor: string }) => {
+  return <span className={`${timeLabelsColor}`}>{value}</span>;
+};
+
+// Current time indicator component
+const CurrentTimeIndicator = () => {
+  const currentTime = new Date();
+  const hours = currentTime.getHours();
+  const minutes = currentTime.getMinutes();
+  
+  // Calculate position as percentage of the day (8am-5pm = 9 hours = 540 minutes)
+  const startHour = 8; // 8am
+  const timeRange = 9 * 60; // 9 hours in minutes
+  
+  const currentMinutes = (hours - startHour) * 60 + minutes;
+  const position = (currentMinutes / timeRange) * 100;
+  
+  // Only show if current time is within business hours
+  if (hours < startHour || hours >= startHour + 9) return null;
+  
+  return (
+    <div 
+      className="absolute left-0 right-0 z-10 border-t-2 border-red-500 pointer-events-none"
+      style={{ top: `${position}%` }}
+    >
+      <div className="bg-red-500 text-white text-xs rounded px-1 py-0.5 absolute -mt-3 -ml-1">
+        {currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      </div>
+    </div>
+  );
+};
+
+// Custom header to show day of week labels
+const DayHeaderCell = ({ date }: { date: Date }) => {
+  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+  const dayNum = date.getDate();
+  
+  return (
+    <div className="text-center">
+      <div className="font-medium text-gray-700">{dayName}</div>
+      <div className="text-sm text-gray-500">{dayNum}</div>
+    </div>
+  );
+};
+
 // Use type assertion to help TypeScript understand the DnD wrapper
 const DnDCalendar = withDragAndDrop(Calendar as any) as any;
 
-const BigCalendar = () => {
-    const [view, setView] = useState<View>(Views.WORK_WEEK);
+const BigCalendar = ({ 
+  hideToolbar = false, 
+  date, 
+  view = 'work_week',
+  onNavigate,
+  onView,
+  showCurrentTimeIndicator = false,
+  showDayHeaders = false,
+  timeLabelsColor = ''
+}: BigCalendarProps) => {
+    const [currentView, setCurrentView] = useState<View>(view as View);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [hardViolations, setHardViolations] = useState<any[]>([]);
     const [softWarnings, setSoftWarnings] = useState<any[]>([]);
     const [showViolationPanel, setShowViolationPanel] = useState(false);
     const [pendingEvent, setPendingEvent] = useState<CalendarEvent | null>(null);
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [currentDate, setCurrentDate] = useState(date || new Date());
+
+    // Handle external navigation if provided
+    useEffect(() => {
+      if (date) {
+        setCurrentDate(date);
+      }
+    }, [date]);
+
+    // Handle external view changes if provided
+    useEffect(() => {
+      if (view) {
+        setCurrentView(view as View);
+      }
+    }, [view]);
 
     const fetchEvents = useCallback(async () => {
         try {
@@ -106,21 +192,21 @@ const BigCalendar = () => {
         }
     }, []);
 
-    // Navigation functions
-    const handleNextWeek = () => {
-        const nextWeek = new Date(currentDate);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        setCurrentDate(nextWeek);
+    // Navigation functions - used only if no external control
+    const handleNavigation = (newDate: Date) => {
+        if (onNavigate) {
+            onNavigate(newDate);
+        } else {
+            setCurrentDate(newDate);
+        }
     };
 
-    const handlePrevWeek = () => {
-        const prevWeek = new Date(currentDate);
-        prevWeek.setDate(prevWeek.getDate() - 7);
-        setCurrentDate(prevWeek);
-    };
-
-    const handleToday = () => {
-        setCurrentDate(new Date());
+    const handleViewChange = (newView: View) => {
+        if (onView) {
+            onView(newView as string);
+        } else {
+            setCurrentView(newView);
+        }
     };
 
     useEffect(() => {
@@ -194,11 +280,126 @@ const BigCalendar = () => {
             toast.error('Failed to check constraints');
         }
     };
-
-    const handleOnChangeView = (selectedView: View) => {
-        setView(selectedView);
-    };
     
+    // Use any type for the drag and drop handlers since the library typings are giving us trouble
+    const moveEvent = useCallback((eventData: any) => {
+        const { event, start, end } = eventData;
+        
+        // Find the original event with all properties from your events array
+        const originalEvent = events.find(e => e.id === event.id);
+        
+        if (!originalEvent) {
+            toast.error("Could not find original event data");
+            return;
+        }
+        
+        // Create updated event by merging original event with new start/end times
+        // AND ensure the required fields have default values if missing
+        const updatedEvent = {
+            ...originalEvent,
+            start: new Date(start),
+            end: new Date(end),
+            room_id: originalEvent.room_id || "1",
+            staff_id: originalEvent.staff_id || "1",
+            course_id: originalEvent.course_id || "1",
+            timeslot_id: originalEvent.timeslot_id // Explicitly add it
+        };  
+        
+        toast.info("Checking constraints...");
+        
+        checkConstraints(updatedEvent)
+            .then(result => {
+                const violations = result.hardViolations || [];
+                const warnings = result.softWarnings || [];
+                
+                console.log('Constraint check result:', { violations, warnings });
+                
+                if (violations.length > 0) {
+                    toast.error("Cannot move event due to hard constraints");
+                    // Refresh to original position
+                    setEvents([...events]); 
+                } else {
+                    setEvents(prev => 
+                        prev.map(ev => ev.id === event.id ? updatedEvent : ev)
+                    );
+                    
+                    if (warnings.length > 0) {
+                        toast.warning("Soft constraints violated");
+                    } else {
+                        toast.success("Event moved successfully");
+                    }
+                    
+                    saveEvent(updatedEvent);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking constraints:', error);
+                toast.error(`Failed to check constraints: ${error.message}`);
+                // Reset the event to its original position
+                setEvents([...events]);
+            });
+    }, [events]);
+
+    const eventStyleGetter = (event: CalendarEvent) => {
+        const style: React.CSSProperties = {
+            backgroundColor: '#3174ad',
+            borderRadius: '6px',
+            opacity: 0.85,
+            color: 'white',
+            border: '1px solid rgba(0,0,0,0.2)',
+            display: 'block',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2)',
+            marginRight: '2px',
+            marginLeft: '2px',
+            fontWeight: 500,
+        };
+        
+        // Use a more consistent color palette
+        if (event.tag) {
+            switch (event.tag.toUpperCase()) {
+                case 'CLASS':
+                    style.backgroundColor = '#4285F4'; // Blue
+                    style.borderLeft = '3px solid #1a73e8';
+                    break;
+                case 'EXAM':
+                    style.backgroundColor = '#EA4335'; // Red
+                    style.borderLeft = '3px solid #d93025';
+                    break;
+                case 'MEETING':
+                    style.backgroundColor = '#FBBC05'; // Yellow
+                    style.color = 'black';
+                    style.borderLeft = '3px solid #f29900';
+                    break;
+                case 'EVENT':
+                    style.backgroundColor = '#34A853'; // Green
+                    style.borderLeft = '3px solid #1e8e3e';
+                    break;
+                default:
+                    style.backgroundColor = '#4285F4'; // Default - Blue
+                    style.borderLeft = '3px solid #1a73e8';
+            }
+        }
+    
+        if (event.hasConstraintWarnings) {
+            style.borderLeft = '4px solid #F9A825';
+        }
+        
+        if (event.hasConstraintViolations) {
+            style.borderLeft = '4px solid #D32F2F';
+        }
+        
+        return { style };
+    };
+
+    const EventComponent = ({ event }: EventProps<CalendarEvent>) => {
+        return (
+          <div className="flex flex-col h-full overflow-hidden p-1">
+            <div className="text-xs font-semibold mb-1 truncate">{event.title}</div>
+            {event.room_id && <div className="text-xs opacity-80 truncate">Room: {event.room_id}</div>}
+          </div>
+        );
+    };
+
     const saveEvent = async (event: CalendarEvent) => {
         try {
             // Log event before formatting for API
@@ -250,168 +451,42 @@ const BigCalendar = () => {
         }
     };
 
-    // Use any type for the drag and drop handlers since the library typings are giving us trouble
-    const moveEvent = useCallback((eventData: any) => {
-        const { event, start, end } = eventData;
-        
-        // Find the original event with all properties from your events array
-        const originalEvent = events.find(e => e.id === event.id);
-        
-        if (!originalEvent) {
-            toast.error("Could not find original event data");
-            return;
-        }
-        
-        // Log the original event AND specifically its timeslot_id
-        console.log("Original event found:", originalEvent);
-        console.log("Original event timeslot_id:", originalEvent.timeslot_id); // <-- ADD THIS LOG
-        
-        // Create updated event by merging original event with new start/end times
-        // AND ensure the required fields have default values if missing
-        const updatedEvent = {
-            ...originalEvent,
-            start: new Date(start),
-            end: new Date(end),
-            room_id: originalEvent.room_id || "1",
-            staff_id: originalEvent.staff_id || "1",
-            course_id: originalEvent.course_id || "1",
-            timeslot_id: originalEvent.timeslot_id // Explicitly add it
-        };  
-        
-        // Log the merged event AND specifically its timeslot_id
-        console.log("Updated event before checkConstraints:", updatedEvent);
-        console.log("Updated event timeslot_id:", updatedEvent.timeslot_id); // <-- ADD THIS LOG
-        
-        toast.info("Checking constraints...");
-        
-        checkConstraints(updatedEvent)
-            .then(result => {
-                const violations = result.hardViolations || [];
-                const warnings = result.softWarnings || [];
-                
-                console.log('Constraint check result:', { violations, warnings });
-                
-                if (violations.length > 0) {
-                    toast.error("Cannot move event due to hard constraints");
-                    // Refresh to original position
-                    setEvents([...events]); 
-                } else {
-                    setEvents(prev => 
-                        prev.map(ev => ev.id === event.id ? updatedEvent : ev)
-                    );
-                    
-                    if (warnings.length > 0) {
-                        toast.warning("Soft constraints violated");
-                    } else {
-                        toast.success("Event moved successfully");
-                    }
-                    
-                    saveEvent(updatedEvent);
-                }
-            })
-            .catch(error => {
-                console.error('Error checking constraints:', error);
-                toast.error(`Failed to check constraints: ${error.message}`);
-                // Reset the event to its original position
-                setEvents([...events]);
-            });
-    }, [events]);
-
-    const eventStyleGetter = (event: CalendarEvent) => {
-        const style: React.CSSProperties = {
-            backgroundColor: '#3174ad',
-            borderRadius: '6px',
-            opacity: 0.85,
-            color: 'white',
-            border: '1px solid rgba(0,0,0,0.2)',
-            display: 'block',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2)',
-            marginRight: '2px',
-            marginLeft: '2px',
-            fontWeight: 500,
+    // Create custom components based on props
+    const components = useMemo(() => {
+        const comps: any = {
+            event: EventComponent,
+            toolbar: hideToolbar ? () => null : undefined // Hide toolbar if requested
         };
-        
-        if (event.tag) {
-            switch (event.tag.toUpperCase()) {
-                case 'CLASS':
-                    style.backgroundColor = '#4285F4';
-                    style.borderLeft = '3px solid #1a73e8';
-                    break;
-                case 'EXAM':
-                    style.backgroundColor = '#EA4335';
-                    style.borderLeft = '3px solid #d93025';
-                    break;
-                case 'MEETING':
-                    style.backgroundColor = '#FBBC05';
-                    style.color = 'black';
-                    style.borderLeft = '3px solid #f29900';
-                    break;
-                case 'EVENT':
-                    style.backgroundColor = '#34A853';
-                    style.borderLeft = '3px solid #1e8e3e';
-                    break;
-            }
-        }
-    
-        if (event.hasConstraintWarnings) {
-            style.borderLeft = '4px solid #F9A825';
-        }
-        
-        if (event.hasConstraintViolations) {
-            style.borderLeft = '4px solid #D32F2F';
-        }
-        
-        return { style };
-    };
 
-    const EventComponent = ({ event }: EventProps<CalendarEvent>) => {
-        return (
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="text-xs font-semibold mb-1 truncate">{event.title}</div>
-            {event.room_id && <div className="text-xs opacity-80 truncate">Room: {event.room_id}</div>}
-          </div>
-        );
-      };
+        // Add custom time gutter header/cell if timeLabelsColor is specified
+        if (timeLabelsColor) {
+            comps.timeGutterHeader = () => <TimeGutterHeader timeLabelsColor={timeLabelsColor} />;
+            comps.timeGutterCell = ({ value }: { value: string }) => (
+                <TimeGutterCell value={value} timeLabelsColor={timeLabelsColor} />
+            );
+        }
+
+        // Add day headers if showDayHeaders is true
+        if (showDayHeaders) {
+            comps.header = ({ date }: { date: Date }) => <DayHeaderCell date={date} />;
+        }
+
+        return comps;
+    }, [hideToolbar, timeLabelsColor, showDayHeaders]);
 
     return (
         <div className='relative'>
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                    <button 
-                        onClick={handlePrevWeek}
-                        className="px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
-                    >
-                        Prev
-                    </button>
-                    <button 
-                        onClick={handleToday}
-                        className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600"
-                    >
-                        Today
-                    </button>
-                    <button 
-                        onClick={handleNextWeek}
-                        className="px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
-                    >
-                        Next
-                    </button>
-                </div>
-                <div className="text-lg font-medium">
-                    {moment(currentDate).format('MMMM DD, YYYY')}
-                </div>
-            </div>
-            
             <DnDCalendar
                 localizer={localizer}
                 events={events}
                 startAccessor="start"
                 endAccessor="end"
                 views={["work_week", "day"]}
-                view={view}
+                view={currentView}
                 date={currentDate}
-                onNavigate={setCurrentDate}
+                onNavigate={handleNavigation}
                 style={{ height: "82vh", padding: "5px", borderRadius: "12px" }}
-                onView={handleOnChangeView}
+                onView={handleViewChange}
                 min={new Date(2025, 1, 0, 8, 0, 0)}
                 max={new Date(2025, 1, 0, 18, 0, 0)}
                 selectable
@@ -421,11 +496,14 @@ const BigCalendar = () => {
                 resizable
                 onEventResize={moveEvent}
                 eventPropGetter={eventStyleGetter}
-                components={{
-                    event: EventComponent
-                }}
+                components={components}
                 dayLayoutAlgorithm="no-overlap"
             />
+
+            {/* Current time indicator */}
+            {showCurrentTimeIndicator && currentView === 'work_week' && (
+                <CurrentTimeIndicator />
+            )}
 
             {showViolationPanel && (
                 <ConstraintViolationPanel 
