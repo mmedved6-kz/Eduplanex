@@ -664,7 +664,7 @@ const EventForm = ({
                   onChange={(e) => setStudentSearch(e.target.value)}
                 />
                 <div className="absolute left-2 top-2.5">
-                  <Image src="/search.png" alt="Search" width={14} height={14} />
+                  <Image src="/search.png" alt="Search" width={14} height={14} className="filter invert"/>
                 </div>
               </div>
 

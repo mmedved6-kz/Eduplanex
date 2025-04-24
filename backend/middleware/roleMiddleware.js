@@ -1,4 +1,3 @@
-// middleware/roleMiddleware.js
 const roleMiddleware = (roles) => {
     return (req, res, next) => {
       if (!req.user) {

@@ -10,47 +10,6 @@ const db = require('../config/db');
 */
 class SchedulerOptimizer {
     /**
-     * To generate timeslots for a given date range and duration
-     * @param {Date} start_time 
-     * @param {Date} end_time 
-     * @param {Number} durationMinutes 
-     * @param {Array} daysToInclude 
-     * @returns {Array} Array of time slots
-     */
-    static async generateTimeSlots(startDate, endDate, durationMinutes = 60, daysToSchedule = [1, 2, 3, 4, 5]) {
-      const slots = [];
-      
-      // Fetch all timeslot definitions from the database
-      const timeslots = await db.any(
-        `SELECT * FROM timeslot 
-         WHERE ABS(duration_minutes - $1) <= 30
-         ORDER BY start_time`,
-        [durationMinutes]
-      );
-      
-      // For each day in the range
-      for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
-        // Skip days that aren't in our scheduling days
-        if (!daysToSchedule.includes(day.getDay())) continue;
-        
-        const dateStr = day.toISOString().split('T')[0];
-        
-        // Add each timeslot for this day
-        for (const timeslot of timeslots) {
-          slots.push({
-            date: dateStr,
-            timeslotId: timeslot.id,
-            timeslot: timeslot,
-            formattedDate: day.toLocaleDateString(),
-            formattedTime: `${timeslot.start_time} - ${timeslot.end_time}`
-          });
-        }
-      }
-      
-      return slots;
-    }
-
-    /**
      * Fetch all constraints and fetch events needed for scehduling
      * @returns object containing rooms, staff and existing events
      */
@@ -705,36 +664,36 @@ class SchedulerOptimizer {
    */
   static async evaluateFitness(chromosome, problem) {
     // Convert chromosome to schedule format
-    const schedule = chromosome.genes.map(gene => {
-      // Ensure timeSlot.start and timeSlot.end are Date objects
-      const start = gene.timeSlot.start instanceof Date ? 
-        gene.timeSlot.start : new Date(gene.timeSlot.start);
-      const end = gene.timeSlot.end instanceof Date ? 
-        gene.timeSlot.end : new Date(gene.timeSlot.end);
+    const schedule = chromosome.genes.map(gene => ({
+      ...gene.event,
+      roomId: gene.room.id,
+      staffId: gene.staff.id,
+      start: gene.timeSlot.start,
+      end: gene.timeSlot.end
+    }));
     
-      return {
-        ...gene.event,
-        roomId: gene.room.id,
-        staffId: gene.staff.id,
-        start,
-        end
-      };
-    });
+    let fitness = 10000;
+
+     // Hard constraints are critical - major penalty for violations
+    fitness -= evaluation.hardViolations * 1000;
+  
+    // Room utilization score - reward efficient use of rooms
+    fitness += evaluation.resourceUtilization * 100;
     
-    // Evaluate the schedule
-    const evaluation = await this.evaluateSchedule(schedule, problem);
+    // Staff workload balance - reward even distribution of teaching
+    fitness += evaluation.staffWorkloadBalance * 100;
     
-    // Calculate fitness (higher is better)
-    const hardPenalty = evaluation.hardViolations * 1000; // Large penalty for hard violations
-    const softPenalty = evaluation.softViolations * 10;   // Smaller penalty for soft violations
+    // Student experience - reward good scheduling for students
+    fitness += evaluation.studentExperience * 100;
     
-    // Rewards for good utilization
-    const utilizationReward = evaluation.resourceUtilization * 100;
-    const balanceReward = evaluation.staffWorkloadBalance * 50;
-    const experienceReward = evaluation.studentExperience * 50;
-    
-    // Total fitness
-    return 1000 - hardPenalty - softPenalty + utilizationReward + balanceReward + experienceReward;
+    // Soft constraints - smaller penalties
+    fitness -= evaluation.softViolations * 10;
+  
+    // Store the detailed metrics for reporting
+    chromosome.evaluationDetails = evaluation;
+    chromosome.fitness = fitness;
+  
+    return fitness;
   }
 
   /**
@@ -747,6 +706,8 @@ class SchedulerOptimizer {
   static tournamentSelection(population, fitnessScores, selectionSize) {
     const selected = [];
     const tournamentSize = 3;
+
+    const selectionPressure = {};
     
     while (selected.length < selectionSize) {
       // Select random individuals for tournament
@@ -763,8 +724,28 @@ class SchedulerOptimizer {
         }
       }
       
-      // Add winner to selected individuals
-      selected.push(JSON.parse(JSON.stringify(population[bestIndex]))); // Deep clone
+      if (selectionPressure[bestIndex] && selectionPressure[bestIndex] > 3 && Math.random() < 0.3) {
+        let secondBestIndex = -1;
+        let secondBestScore = -Infinity;
+        
+        for (let i = 0; i < tournamentIndices.length; i++) {
+          const idx = tournamentIndices[i];
+          if (idx !== bestIndex && fitnessScores[idx] > secondBestScore) {
+            secondBestIndex = idx;
+            secondBestScore = fitnessScores[idx];
+          }
+        }
+        
+        if (secondBestIndex !== -1) {
+          bestIndex = secondBestIndex;
+        }
+      }
+      
+      // Update selection pressure counter
+      selectionPressure[bestIndex] = (selectionPressure[bestIndex] || 0) + 1;
+      
+      // Add winner to selected individuals (deep clone to avoid reference issues)
+      selected.push(JSON.parse(JSON.stringify(population[bestIndex])));
     }
     
     return selected;
@@ -792,28 +773,58 @@ class SchedulerOptimizer {
     parent2.genes.forEach(gene => {
       eventMap2[gene.event.moduleId] = gene;
     });
+
+    const groupedEvents = this.groupEventsByRelationship([...parent1.genes, ...parent2.genes]);
     
-    // Get list of all moduleIds
-    const allModuleIds = [...new Set([
-      ...parent1.genes.map(g => g.event.moduleId),
-      ...parent2.genes.map(g => g.event.moduleId)
-    ])];
-    
-    // Select crossover point
-    const crossoverPoint = Math.floor(Math.random() * allModuleIds.length);
-    
-    // Create children
-    allModuleIds.forEach((moduleId, index) => {
-      if (index < crossoverPoint) {
-        if (eventMap1[moduleId]) child1.genes.push(JSON.parse(JSON.stringify(eventMap1[moduleId])));
-        if (eventMap2[moduleId]) child2.genes.push(JSON.parse(JSON.stringify(eventMap2[moduleId])));
+    Object.values(groupedEvents).forEach(eventIds => {
+      const useParent1 = Math.random() < 0.5;
+      
+      if (useParent1) {
+        // Child 1 inherits this group from parent 1, child 2 from parent 2
+        eventIds.forEach(id => {
+          if (eventMap1[id]) child1.genes.push(JSON.parse(JSON.stringify(eventMap1[id])));
+          if (eventMap2[id]) child2.genes.push(JSON.parse(JSON.stringify(eventMap2[id])));
+        });
       } else {
-        if (eventMap2[moduleId]) child1.genes.push(JSON.parse(JSON.stringify(eventMap2[moduleId])));
-        if (eventMap1[moduleId]) child2.genes.push(JSON.parse(JSON.stringify(eventMap1[moduleId])));
+        // Child 1 inherits this group from parent 2, child 2 from parent 1
+        eventIds.forEach(id => {
+          if (eventMap2[id]) child1.genes.push(JSON.parse(JSON.stringify(eventMap2[id])));
+          if (eventMap1[id]) child2.genes.push(JSON.parse(JSON.stringify(eventMap1[id])));
+        });
       }
     });
     
     return [child1, child2];
+  }
+
+  /**
+    * Group events by relationship to keep related events together during crossover
+  */
+  static groupEventsByRelationship(genes) {
+    const groups = {};
+  
+    // Group by course and staff
+    genes.forEach(gene => {
+      let groupKey;
+    
+      if (gene.event.courseId) {
+        groupKey = `course-${gene.event.courseId}`;
+      } else if (gene.event.staffId) {
+        groupKey = `staff-${gene.event.staffId}`;
+      } else {
+        groupKey = `module-${gene.event.moduleId}`;
+      }
+    
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+    
+      if (!groups[groupKey].includes(gene.event.moduleId)) {
+        groups[groupKey].push(gene.event.moduleId);
+      }
+    });
+  
+    return groups;
   }
 
   /**
@@ -829,29 +840,38 @@ class SchedulerOptimizer {
     // Select a random gene
     if (mutated.genes.length === 0) return mutated;
     
-    const geneIndex = Math.floor(Math.random() * mutated.genes.length);
-    const gene = mutated.genes[geneIndex];
+    const adaptiveMutationRate = mutationRate * (1 + (generation / 50));
     
-    // Decide what to mutate (room, staff, or time)
-    const mutationType = Math.random();
-    
-    if (mutationType < 0.33) {
-      // Mutate room
-      const eligibleRooms = problem.rooms.filter(
-        r => r.capacity >= (gene.event.student_count || 0)
-      );
-      if (eligibleRooms.length > 0) {
-        gene.room = this.getRandomElement(eligibleRooms);
-      }
-    } else if (mutationType < 0.66) {
-      // Mutate staff
-      if (problem.staff.length > 0) {
-        gene.staff = this.getRandomElement(problem.staff);
-      }
-    } else {
-      // Mutate time slot
-      if (problem.timeSlots.length > 0) {
-        gene.timeSlot = this.getRandomElement(problem.timeSlots);
+    for (let i = 0; i < mutated.genes.length; i++) {
+      if (Math.random() > adaptiveMutationRate) continue;
+      
+      const gene = mutated.genes[i];
+      
+      // Select what to mutate based on potential issues
+      const mutationType = this.selectMutationType(gene, mutated.genes);
+      
+      switch (mutationType) {
+        case 'room':
+          // Select rooms with sufficient capacity
+          const eligibleRooms = problem.rooms.filter(r => r.capacity >= gene.event.student_count);
+          if (eligibleRooms.length > 0) {
+            gene.room = this.getRandomElement(eligibleRooms);
+          }
+          break;
+          
+        case 'staff':
+          // Try to assign appropriate staff
+          if (problem.staff.length > 0) {
+            gene.staff = this.getRandomElement(problem.staff);
+          }
+          break;
+          
+        case 'time':
+          // Change time slot
+          if (problem.timeSlots.length > 0) {
+            gene.timeSlot = this.getRandomElement(problem.timeSlots);
+          }
+          break;
       }
     }
     
@@ -862,11 +882,192 @@ class SchedulerOptimizer {
    * Generate a unique event ID
    * @returns {String} Unique event ID
    */
-  static generateEventId() {
-    const prefix = 'EVT';
-    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${prefix}${randomSuffix}`;
+  /**
+ * Intelligence mutation type selection based on constraint issues
+ */
+static selectMutationType(gene, allGenes) {
+  // Check for room capacity issues
+  const hasCapacityIssue = gene.room.capacity < gene.event.student_count;
+  
+  // Check for room conflicts
+  const hasRoomConflict = allGenes.some(otherGene => 
+    otherGene !== gene && 
+    otherGene.room.id === gene.room.id && 
+    this.timeslotsOverlap(otherGene.timeSlot, gene.timeSlot)
+  );
+  
+  // Check for staff conflicts
+  const hasStaffConflict = allGenes.some(otherGene => 
+    otherGene !== gene && 
+    otherGene.staff.id === gene.staff.id && 
+    this.timeslotsOverlap(otherGene.timeSlot, gene.timeSlot)
+  );
+  
+  // Choose mutation type based on issues
+  if (hasCapacityIssue) {
+    return 'room'; // Change room if capacity is insufficient
+  } else if (hasRoomConflict) {
+    return Math.random() < 0.7 ? 'room' : 'time'; // Either change room or time
+  } else if (hasStaffConflict) {
+    return Math.random() < 0.7 ? 'time' : 'staff'; // Prefer changing time over staff
+  } else {
+    // Random mutation if no specific issues
+    const types = ['room', 'staff', 'time'];
+    return types[Math.floor(Math.random() * types.length)];
   }
+}
+
+/**
+ * Check if two timeslots overlap
+ */
+static timeslotsOverlap(ts1, ts2) {
+  // Get start and end times in a comparable format
+  const getTimeAsMinutes = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  const start1 = ts1.start_time ? getTimeAsMinutes(ts1.start_time) : 0;
+  const end1 = ts1.end_time ? getTimeAsMinutes(ts1.end_time) : 0;
+  const start2 = ts2.start_time ? getTimeAsMinutes(ts2.start_time) : 0;
+  const end2 = ts2.end_time ? getTimeAsMinutes(ts2.end_time) : 0;
+  
+  return start1 < end2 && start2 < end1;
+}
+
+/**
+ * Enhanced genetic algorithm with improved tracking
+ */
+static async runGeneticAlgorithm(problem) {
+  // Algorithm parameters
+  const populationSize = 50;
+  const generations = 100;
+  const baseMutationRate = 0.1;
+  const crossoverRate = 0.8;
+  const eliteCount = 5; // Number of best chromosomes to preserve unchanged
+  
+  console.log(`Running enhanced genetic algorithm with population ${populationSize}, generations ${generations}`);
+  
+  // Initialize population
+  let population = await this.initializePopulation(populationSize, problem);
+  let bestChromosome = null;
+  let bestFitness = -Infinity;
+  
+  // Tracking metrics for visualization
+  const metrics = {
+    generationBestFitness: [],
+    generationAvgFitness: [],
+    hardViolationsPerGeneration: [],
+    softViolationsPerGeneration: [],
+    resourceUtilization: [],
+    workloadBalance: []
+  };
+  
+  // Evolution over generations
+  for (let gen = 0; gen < generations; gen++) {
+    // Evaluate fitness for all chromosomes
+    const fitnessScores = [];
+    const evaluations = [];
+    
+    for (const chromosome of population) {
+      const fitness = await this.evaluateFitness(chromosome, problem);
+      fitnessScores.push(fitness);
+      evaluations.push(chromosome.evaluationDetails);
+    }
+    
+    // Track metrics for this generation
+    const avgFitness = fitnessScores.reduce((sum, f) => sum + f, 0) / fitnessScores.length;
+    const genBestIndex = fitnessScores.indexOf(Math.max(...fitnessScores));
+    const genBestFitness = fitnessScores[genBestIndex];
+    
+    metrics.generationBestFitness.push(genBestFitness);
+    metrics.generationAvgFitness.push(avgFitness);
+    
+    // Track constraint violations
+    const avgHardViolations = evaluations.reduce((sum, e) => sum + e.hardViolations, 0) / evaluations.length;
+    const avgSoftViolations = evaluations.reduce((sum, e) => sum + e.softViolations, 0) / evaluations.length;
+    
+    metrics.hardViolationsPerGeneration.push(avgHardViolations);
+    metrics.softViolationsPerGeneration.push(avgSoftViolations);
+    
+    // Track resource metrics
+    metrics.resourceUtilization.push(
+      evaluations.reduce((sum, e) => sum + e.resourceUtilization, 0) / evaluations.length
+    );
+    metrics.workloadBalance.push(
+      evaluations.reduce((sum, e) => sum + e.staffWorkloadBalance, 0) / evaluations.length
+    );
+    
+    // Find best chromosome overall
+    if (genBestFitness > bestFitness) {
+      bestFitness = genBestFitness;
+      bestChromosome = JSON.parse(JSON.stringify(population[genBestIndex]));
+    }
+    
+    // Sort population by fitness for elitism
+    const sortedIndices = fitnessScores
+      .map((score, idx) => ({ score, idx }))
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.idx);
+      
+    const elites = sortedIndices.slice(0, eliteCount).map(idx => 
+      JSON.parse(JSON.stringify(population[idx]))
+    );
+    
+    // Selection - tournament selection
+    const selected = this.tournamentSelection(population, fitnessScores, populationSize - eliteCount);
+    
+    // Crossover
+    const offspring = [];
+    for (let i = 0; i < selected.length; i += 2) {
+      if (i + 1 < selected.length && Math.random() < crossoverRate) {
+        const [child1, child2] = this.crossover(selected[i], selected[i + 1]);
+        offspring.push(child1, child2);
+      } else {
+        offspring.push(selected[i]);
+        if (i + 1 < selected.length) {
+          offspring.push(selected[i + 1]);
+        }
+      }
+    }
+    
+    // Mutation
+    for (let i = 0; i < offspring.length; i++) {
+      if (Math.random() < baseMutationRate) {
+        offspring[i] = this.mutate(offspring[i], problem, baseMutationRate, gen);
+      }
+    }
+    
+    // Create new population with elitism
+    population = [...elites, ...offspring.slice(0, populationSize - eliteCount)];
+    
+    // Log progress
+    if (gen % 10 === 0 || gen === generations - 1) {
+      console.log(`Generation ${gen + 1}/${generations}: Best fitness = ${bestFitness}, Avg fitness = ${avgFitness.toFixed(2)}`);
+      console.log(`Hard violations: ${avgHardViolations.toFixed(2)}, Soft violations: ${avgSoftViolations.toFixed(2)}`);
+    }
+  }
+  
+  // Evaluate final solution
+  const finalEvaluation = await this.evaluateSchedule(
+    bestChromosome.genes.map(gene => ({
+      ...gene.event,
+      roomId: gene.room.id,
+      staffId: gene.staff.id,
+      start: gene.timeSlot.start,
+      end: gene.timeSlot.end
+    })),
+    problem
+  );
+  
+  return {
+    bestChromosome,
+    metrics: {
+      ...finalEvaluation,
+      optimizationProgress: metrics
+    }
+  };
+}
 }
 
 module.exports = SchedulerOptimizer;

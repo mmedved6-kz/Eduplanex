@@ -8,7 +8,7 @@ const errorMiddleware = (err, req, res, next) => {
     res.status(statusCode).json({
         success: false,
         message: message,
-        stack: process.env.NODE_NEV === 'development' ? err.stack : undefined,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     });
 };
 

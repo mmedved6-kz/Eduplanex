@@ -328,7 +328,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            <Image src="/close.png" alt="Close" width={16} height={16} />
+            <Image src="/close.png" alt="Close" width={16} height={16} className="filter invert"/>
           </button>
         </div>
         

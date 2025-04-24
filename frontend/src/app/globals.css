@@ -137,3 +137,7 @@
   padding: 10px;
   border-radius: 12px;
 }
+
+.filter.invert {
+  filter: invert(1); /* Inverts colors - white becomes black */
+}

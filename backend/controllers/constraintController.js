@@ -6,6 +6,7 @@ const checkConstraints = async (req, res) => {
     const eventToCheck = req.body;
     console.log("Checking constraints for event:", eventToCheck);
     
+    // Validate required fields
     if (!eventToCheck.room_id && !eventToCheck.roomId) {
       return res.status(400).json({
         error: 'Room ID is required'
@@ -25,23 +26,44 @@ const checkConstraints = async (req, res) => {
       });
     }
     
-    
     const event = {
       id: eventToCheck.id || null,
       roomId: eventToCheck.roomId || eventToCheck.room_id,
       staffId: eventToCheck.staffId || eventToCheck.staff_id,
       moduleId: eventToCheck.moduleId || eventToCheck.module_id,
-      student_count: eventToCheck.student_count || eventToCheck.student_count || 0,
+      student_count: eventToCheck.student_count || eventToCheck.studentCount || 0,
       event_date: eventToCheck.event_date || eventToCheck.eventDate,
       timeslot_id: eventToCheck.timeslot_id || eventToCheck.timeslotId
     };
     
     const result = await Constraint.validateEvent(event);
     
+    // Group violations by category for better UI organization
+    const hardViolationsByCategory = {};
+    const softWarningsByCategory = {};
+    
+    result.hardViolations.forEach(violation => {
+      const category = violation.constraintId.split('-')[0].toUpperCase();
+      if (!hardViolationsByCategory[category]) {
+        hardViolationsByCategory[category] = [];
+      }
+      hardViolationsByCategory[category].push(violation);
+    });
+    
+    result.softWarnings.forEach(warning => {
+      const category = warning.constraintId.split('-')[0].toUpperCase();
+      if (!softWarningsByCategory[category]) {
+        softWarningsByCategory[category] = [];
+      }
+      softWarningsByCategory[category].push(warning);
+    });
+    
     return res.status(200).json({
       hasHardViolations: result.hardViolations.length > 0,
       hardViolations: result.hardViolations,
       softWarnings: result.softWarnings,
+      hardViolationsByCategory,
+      softWarningsByCategory,
       canSchedule: result.hardViolations.length === 0
     });
   } catch (error) {
@@ -60,31 +82,57 @@ const getConstraints = async (req, res) => {
         id: 'room-conflict',
         name: 'Room Conflict',
         description: 'A room cannot be used by multiple classes at the same time',
-        type: 'HARD'
+        type: 'HARD',
+        category: 'ROOM_CONFLICT'
       },
       {
         id: 'staff-conflict',
         name: 'Staff Conflict',
         description: 'Staff cannot teach multiple classes at the same time',
-        type: 'HARD'
+        type: 'HARD',
+        category: 'STAFF_CONFLICT'
       },
       {
         id: 'room-capacity',
         name: 'Room Capacity',
         description: 'Room must have sufficient capacity for the class',
-        type: 'HARD'
+        type: 'HARD',
+        category: 'ROOM_CAPACITY'
+      },
+      {
+        id: 'consecutive-teaching',
+        name: 'Consecutive Teaching Hours',
+        description: 'Staff should not exceed the maximum consecutive teaching hours',
+        type: 'HARD',
+        category: 'CONSECUTIVE_TEACHING'
+      },
+      {
+        id: 'building-proximity',
+        name: 'Building Proximity',
+        description: 'Staff should have sufficient time to travel between buildings',
+        type: 'SOFT',
+        category: 'BUILDING_PROXIMITY'
+      },
+      {
+        id: 'lunch-break',
+        name: 'Lunch Break Protection',
+        description: 'Staff should have time for lunch if teaching multiple classes in a day',
+        type: 'SOFT',
+        category: 'LUNCH_BREAK'
       },
       {
         id: 'staff-preferred-hours',
         name: 'Staff Preferred Hours',
         description: 'Staff should teach during their preferred hours when possible',
-        type: 'SOFT'
+        type: 'SOFT',
+        category: 'STAFF_PREFERENCE'
       },
       {
         id: 'back-to-back-classes',
         name: 'Back-to-Back Classes',
         description: 'Staff should have minimal gaps between classes',
-        type: 'SOFT'
+        type: 'SOFT',
+        category: 'STAFF_PREFERENCE'
       }
     ];
     

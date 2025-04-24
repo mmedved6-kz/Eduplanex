@@ -5,7 +5,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between p-4 bg-white">
             {/* Search Section */}
             <div className="hidden md:flex items-center gap-2 text-xs rounded-full border border-gray-300 px-2">
-                <Image src="/search.png" alt="Search" width={14} height={14} />
+                <Image src="/search.png" alt="Search" width={20} height={20} className="filter invert"/>
                 <input
                     type="text"
                     placeholder="Search..."
@@ -15,14 +15,9 @@ const Navbar = () => {
 
             {/* User Actions Section */}
             <div className='flex items-center gap-6 justify-end w-full'>
-                {/* Messages Icon */}
-                <div className='bg-gray-100 rounded-full w-9 h-9 flex items-center justify-center cursor-pointer hover:bg-blue-100'>
-                    <Image src="/message.png" alt="Messages" width={20} height={20} />
-                </div>
-
                 {/* Announcements Icon with Badge */}
                 <div className='bg-gray-100 rounded-full w-9 h-9 flex items-center justify-center cursor-pointer hover:bg-blue-100 relative'>
-                    <Image src="/announcement.png" alt="Announcements" width={20} height={20} />
+                    <Image src="/announcement.png" alt="Announcements" width={20} height={20} className="filter invert"/>
                     <div className='absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded-full text-xs'>
                         3
                     </div>

@@ -1,9 +1,8 @@
 const db = require('../config/db');
 
 const Staff = {
-    // Get all staff
+    // Get all staff with pagination, search, and sorting
     getAll: async (limit, offset, searchQuery, sortColumn, sortOrder, filters) => {
-        // Validate sortColumn and sortOrder preventing SQL injection - CAN BE IGNORED OR REMOVED LATER
         const validColumns = ['staff.name', 'department.name', 'staff.email', 'staff.phone', 'staff.surname', 'staff.id'];
         const defaultSort = 'staff.name';
         

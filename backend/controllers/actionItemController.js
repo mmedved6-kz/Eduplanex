@@ -1,4 +1,3 @@
-// controllers/actionItemController.js
 const ActionItem = require('../models/actionItemModel');
 
 const getAllActionItems = async (req, res) => {

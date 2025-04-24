@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 const Event = {
-    // Get all events
+    // Get all events with pagination, search, and sorting
     getAll: async (limit, offset, searchQuery, sortColumn, sortOrder, filters = {}) => {
       const validColumns = ['event.title', 'module.name', 'event.start_time', 'event.tag', 'event.event_date'];
       const defaultSort = 'event.event_date';

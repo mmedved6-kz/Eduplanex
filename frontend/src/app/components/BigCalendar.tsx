@@ -403,7 +403,7 @@ const BigCalendar = ({
     const saveEvent = async (event: CalendarEvent) => {
         try {
             // Log event before formatting for API
-            console.log("Event before API formatting:", event);
+            // console.log("Event before API formatting:", event);
 
             const apiEvent = {
                 id: event.id,

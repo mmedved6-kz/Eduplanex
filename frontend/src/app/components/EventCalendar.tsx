@@ -129,7 +129,7 @@ const EventCalendar = () => {
             <div className="flex items-center justify-between">
                 <h1 className="text-lg font-semibold my-2">Events</h1>
                 <Link href="/dashboard/list/event">
-                    <Image src="/exam.png" alt="Events Icon" width={18} height={18}  className="cursor-pointer hover:opacity-80" />
+                    <Image src="/event.png" alt="Events Icon" width={18} height={18}  className="cursor-pointer hover:opacity-80 filter invert" />
                 </Link>
             </div>
             <div className="flex-grow overflow-y-auto">
@@ -160,7 +160,7 @@ const EventCalendar = () => {
                             </>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-1" />
+                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-1 filter invert" />
                                 <p className="text-sm text-gray-400">No events for this date.</p>
                             </div>
                         )}

@@ -7,9 +7,11 @@ import StaffForm from "./forms/StaffForm";
 import EventForm from "./forms/EventForm";
 import CourseForm from "./forms/CourseForm";
 import StudentForm from "./forms/StudentForm";
+import ConstraintForm from "./forms/ConstraintForm";
+import ModuleForm from "./forms/ModuleForm";
 
 
-type TableType = "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event";
+type TableType = "staff" | "student" | "module" | "course" | "class" | "department" | "room" | "building" | "event" | "constraint";
 type FormType = "create" | "update" | "delete";
 
 const forms:{
@@ -19,6 +21,8 @@ const forms:{
   event: (type, data, onClose) => <EventForm type={type} data={data} onClose={onClose} />,
   student: (type, data, onClose) => <StudentForm type={type} data={data} onClose={onClose} />,
   course: (type, data, onClose) => <CourseForm type={type} data={data} onClose={onClose} />,
+  constraint: (type, data, onClose) => <ConstraintForm type={type} data={data} onClose={onClose} />,
+  module: (type, data, onClose) => <ModuleForm type={type} data={data} onClose={onClose} />,
 };
 
 const FormModal = ({
@@ -160,7 +164,7 @@ const FormModal = ({
               className="absolute top-4 right-4 cursor-pointer transition-transform duration-200 hover:scale-110"
               onClick={handleClose}
             >
-              <Image src="/close.png" alt="Close" width={14} height={14} />
+              <Image src="/close.png" alt="Close" width={14} height={14} className="filter invert"/>
             </div>
 
             {/* Form Rendering Here */}

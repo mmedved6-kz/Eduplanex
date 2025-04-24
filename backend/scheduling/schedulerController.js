@@ -1,4 +1,3 @@
-const SchedulerService = require('../models/schedulerServiceModel');
 const SchedulerOptimizer = require('../scheduling/schedulerOptimizer');
 const Room = require('../models/roomModel');
 const Module = require('../models/moduleModel');

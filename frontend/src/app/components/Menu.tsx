@@ -38,13 +38,13 @@ const menuItems = [
         visible: ["admin"],
       },
       {
-        icon: "/module.png",
+        icon: "/course.png",
         label: "Courses",
         href: "/dashboard/list/course",
         visible: ["admin", "staff"],
       },
       {
-        icon: "/module.png",
+        icon: "/department.png",
         label: "Departments",
         href: "/dashboard/list/departments",
         visible: ["admin", "staff"],
@@ -55,13 +55,19 @@ const menuItems = [
         href: "/dashboard/list/event",
         visible: ["admin", "staff", "student"],
       },
+      {
+        icon: "/constraint.png",
+        label: "Constraints",
+        href: "/dashboard/list/constraints",
+        visible: ["admin", "staff"],
+      },
     ],
   },
   {
     title: "OTHER",
     items: [
       {
-        icon: "/setting.png",
+        icon: "/settings.png",
         label: "Settings",
         href: "/settings",
         visible: ["admin", "staff", "student"],
@@ -103,11 +109,12 @@ const Menu = () => {
             if (item.visible.includes(userRole)) {
               return (
                 <Link
-                  href={item.href}
+                  href={item.href || '#'}
                   key={item.label}
                   className="flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md hover:bg-blue-50"
-                >
-                  <Image src={item.icon} alt="" width={20} height={20} />
+                  onClick={item.onClick}
+                  >
+                  <Image src={item.icon} alt="" width={20} height={20} className="filter invert"/>
                   <span className="hidden lg:block">{item.label}</span>
                 </Link>
               );
