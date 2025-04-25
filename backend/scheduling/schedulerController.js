@@ -172,7 +172,7 @@ const backtrackSearch = async (assignment, depth, state) => {
     
     // Create a temporary event object for constraint checking
     const tempEvent = {
-      id: null, // New event
+      id: null,
       roomId: room.id,
       staffId: staff.id,
       moduleId: state.eventData.moduleId,

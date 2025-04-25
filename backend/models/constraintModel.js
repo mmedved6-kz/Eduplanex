@@ -276,7 +276,7 @@ const Constraint = {
       });
     }
     
-    // NEW: Consecutive teaching check
+    // Consecutive teaching check
     const consecutiveCheck = await Constraint.checkConsecutiveTeaching(staffId, event_date, timeslot_id, id);
     if (consecutiveCheck.hasViolation) {
       hardViolations.push({
@@ -286,7 +286,7 @@ const Constraint = {
       });
     }
     
-    // NEW: Building proximity check
+    // Building proximity check
     const proximityCheck = await Constraint.checkBuildingProximity(staffId, event_date, timeslot_id, roomId, id);
     if (proximityCheck.hasWarning) {
       softWarnings.push({
@@ -296,7 +296,7 @@ const Constraint = {
       });
     }
     
-    // NEW: Lunch break check
+    // Lunch break check
     const lunchCheck = await Constraint.checkLunchBreak(staffId, event_date, timeslot_id, id);
     if (lunchCheck.hasWarning) {
       softWarnings.push({

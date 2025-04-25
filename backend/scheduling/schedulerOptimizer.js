@@ -9,6 +9,12 @@ const db = require('../config/db');
  * Scheduling optimizer to handle multiple constraints in the scheduling process. e.g. Autoscheduler 
 */
 class SchedulerOptimizer {
+  
+  static generateEventId() {
+    const prefix = 'EVT';
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `${prefix}${randomSuffix}`;
+  }
     /**
      * Fetch all constraints and fetch events needed for scehduling
      * @returns object containing rooms, staff and existing events
@@ -416,7 +422,7 @@ class SchedulerOptimizer {
       
       const allTimeslots = await db.any('SELECT * FROM timeslot ORDER BY start_time');
 
-      const slots = [];
+      const timeSlots = [];
       for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
         if (!daysToSchedule.includes(day.getDay())) continue;
 
@@ -429,16 +435,18 @@ class SchedulerOptimizer {
             if (preferences.timeRange === 'afternoon' && hour < 12) continue;
           }
 
-          slots.push({
+          timeSlots.push({
             date: dateStr,
             timeslotId: timeslot.id,
-            timeslot:timeslot
+            start: new Date(`${dateStr}T${timeslot.start_time}`),
+            end: new Date(`${dateStr}T${timeslot.end_time}`),
+            timeslot: timeslot
           });
         }
       }
 
       const availableSlots = [];
-      for (const slot of slots) {
+      for (const slot of timeSlots) {
         const hasConflict = existingEvents.some(event => 
           event.event_date === slot.date &&
           event.timeslot_id === slot.timeslotId
@@ -503,106 +511,6 @@ class SchedulerOptimizer {
       console.error('Error in genetic algorithm optimization:', error);
       throw error;
     }
-  }
-
-  /**
-   * Implementation of the genetic algorithm
-   * @param {Object} problem - Scheduling problem definition
-   * @returns {Promise<Object>} Best chromosome and metrics
-   */
-  static async runGeneticAlgorithm(problem) {
-    // Algorithm parameters
-    const populationSize = 50;
-    const generations = 100;
-    const mutationRate = 0.1;
-    const crossoverRate = 0.8;
-    const eliteCount = 5; // Number of best chromosomes to keep unchanged
-    
-    console.log(`Running genetic algorithm with population ${populationSize}, generations ${generations}`);
-    
-    // Initialize population
-    let population = await this.initializePopulation(populationSize, problem);
-    let bestChromosome = null;
-    let bestFitness = -Infinity;
-    
-    // Evolution over generations
-    for (let gen = 0; gen < generations; gen++) {
-      // Evaluate fitness for all chromosomes
-      const fitnessScores = await Promise.all(
-        population.map(chromosome => this.evaluateFitness(chromosome, problem))
-      );
-      
-      // Find best chromosome in current generation
-      const bestIndex = fitnessScores.indexOf(Math.max(...fitnessScores));
-      if (fitnessScores[bestIndex] > bestFitness) {
-        bestFitness = fitnessScores[bestIndex];
-        bestChromosome = JSON.parse(JSON.stringify(population[bestIndex])); // Deep clone
-      }
-      
-      // Sort population by fitness for elitism
-      const sortedIndices = fitnessScores
-        .map((score, idx) => ({ score, idx }))
-        .sort((a, b) => b.score - a.score)
-        .map(item => item.idx);
-        
-      const elites = sortedIndices.slice(0, eliteCount).map(idx => 
-        JSON.parse(JSON.stringify(population[idx]))
-      );
-      
-      // Selection - tournament selection
-      const selected = this.tournamentSelection(population, fitnessScores, populationSize);
-      
-      // Crossover
-      const offspring = [];
-      for (let i = 0; i < selected.length; i += 2) {
-        if (i + 1 < selected.length && Math.random() < crossoverRate) {
-          const [child1, child2] = this.crossover(selected[i], selected[i + 1]);
-          offspring.push(child1, child2);
-        } else {
-          offspring.push(selected[i]);
-          if (i + 1 < selected.length) {
-            offspring.push(selected[i + 1]);
-          }
-        }
-      }
-      
-      // Mutation
-      for (let i = 0; i < offspring.length; i++) {
-        if (Math.random() < mutationRate) {
-          offspring[i] = this.mutate(offspring[i], problem);
-        }
-      }
-      
-      // Elitism - keep best chromosomes
-      population = [...elites];
-      
-      // Fill the rest of the population from offspring
-      while (population.length < populationSize && offspring.length > 0) {
-        population.push(offspring.pop());
-      }
-      
-      // Progress log every 10 generations
-      if (gen % 10 === 0 || gen === generations - 1) {
-        console.log(`Generation ${gen + 1}/${generations}: Best fitness = ${bestFitness}`);
-      }
-    }
-    
-    // Evaluate final metrics for the best solution
-    const metrics = await this.evaluateSchedule(
-      bestChromosome.genes.map(gene => ({
-        ...gene.event,
-        roomId: gene.room.id,
-        staffId: gene.staff.id,
-        start: gene.timeSlot.start,
-        end: gene.timeSlot.end
-      })),
-      problem
-    );
-    
-    return {
-      bestChromosome,
-      metrics
-    };
   }
 
   /**
@@ -671,6 +579,8 @@ class SchedulerOptimizer {
       start: gene.timeSlot.start,
       end: gene.timeSlot.end
     }));
+
+    const evaluation = await this.evaluateSchedule(schedule, problem);
     
     let fitness = 10000;
 
@@ -831,9 +741,11 @@ class SchedulerOptimizer {
    * Mutation operator for genetic algorithm
    * @param {Object} chromosome - Chromosome to mutate
    * @param {Object} problem - Problem definition
+   * @param {Number} mutationRate - Current mutation rate
+   * @param {Number} generation - Current generation number
    * @returns {Object} Mutated chromosome
    */
-  static mutate(chromosome, problem) {
+  static mutate(chromosome, problem, mutationRate, generation) {
     // Clone chromosome to avoid modifying original
     const mutated = JSON.parse(JSON.stringify(chromosome));
     
@@ -853,7 +765,7 @@ class SchedulerOptimizer {
       switch (mutationType) {
         case 'room':
           // Select rooms with sufficient capacity
-          const eligibleRooms = problem.rooms.filter(r => r.capacity >= gene.event.student_count);
+          const eligibleRooms = problem.rooms.filter(r => r.capacity >= gene.event.student_count || 0);
           if (eligibleRooms.length > 0) {
             gene.room = this.getRandomElement(eligibleRooms);
           }
