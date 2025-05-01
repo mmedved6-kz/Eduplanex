@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import OptimizationChart from './OptimizationChart';
+import { time } from 'console';
 
 interface AutoScheduleModalProps {
   isOpen: boolean;
@@ -10,27 +11,27 @@ interface AutoScheduleModalProps {
 }
 
 interface EventToSchedule {
-  id?: string | number; // Add optional ID
+  id?: string | number; 
   title: string;
   moduleId: string;
-  students?: string[]; // Array of student IDs
-  student_count?: number; // Kept for backward compatibility
+  students?: string[]; 
+  student_count?: number; 
   durationMinutes: number;
   staffId?: string;
   roomId?: string;
-  isExisting?: boolean; // Flag to differentiate
-  // Add other properties from your fetched existing events if needed
+  isExisting?: boolean; 
   eventDate?: string;
   event_date?: string;
   timeslotStart?: string;
   startTime?: string;
   timeslotEnd?: string;
+  timeslot_id?: string;
   endTime?: string;
-  start?: string; // Add optional start property
-  end?: string; // Add optional end property
+  start?: string; 
+  end?: string; 
   roomName?: string;
   staffName?: string;
-  room_id?: string; // From snippet
+  room_id?: string; 
   staff_id?: string;
 }
 
@@ -59,6 +60,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
   const [existingEvents, setExistingEvents] = useState<any[]>([]);
   const [selectedExistingEventIds, setSelectedExistingEventIds] = useState<Set<string | number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [timeslots, setTimeslots] = useState<any[]>([]);
 
   // Scheduling preferences
   const [preferences, setPreferences] = useState({
@@ -81,7 +83,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
       setSelectedExistingEventIds(new Set());
 
       const initializeEvents = async () => {
-        setLoading(true); // Start loading
+        setLoading(true); 
         let fetchedExistingEvents: EventToSchedule[] = [];
         try {
           // Fetch existing events from your calendar endpoint
@@ -93,13 +95,23 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
               ...evt,
               id: evt.id, 
               title: evt.title,
-              eventDate: evt.start,
-              timeslotStart: formatTime(evt.start),
-              timeslotEnd: formatTime(evt.end),
+              eventDate: evt.eventDate || evt.event_date || (evt.start ? new Date(evt.start).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+              event_date: evt.event_date || evt.eventDate || (evt.start ? new Date(evt.start).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+              timeslotId: evt.timeslotId || evt.timeslot_id,
+              timeslot_id: evt.timeslot_id || evt.timeslotId,
+              timeslotStart: evt.timeslotStart || evt.startTime || evt.start_time,
+              timeslotEnd: evt.timeslotEnd || evt.endTime || evt.end_time,
+              roomId: evt.roomId || evt.room_id,
+              room_id: evt.room_id || evt.roomId,
+              staffId: evt.staffId || evt.staff_id,
+              staff_id: evt.staff_id || evt.staffId,
+              moduleId: evt.moduleId || evt.module_id,
+              module_id: evt.module_id || evt.moduleId,
               roomName: evt.roomName, 
               staffName: evt.staffName, 
               isExisting: true, 
             }));
+
             console.log("Fetched existing events:", fetchedExistingEvents);
           } else {
             console.error('Failed to fetch existing events:', response.status);
@@ -109,9 +121,8 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
           console.error('Error fetching existing events:', error);
           setError('Error loading existing events.');
         } finally {
-          // Set the main events state with existing events
           setEvents(fetchedExistingEvents);
-          setLoading(false); // Stop loading after fetch
+          setLoading(false); 
         }
       };
 
@@ -150,6 +161,16 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
         const data = await studentsResponse.json();
         setStudents(data.items || []);
       }
+
+      try {
+        const timeslotsResponse = await fetch('http://localhost:5000/api/timeslots?pageSize=100');
+        if (timeslotsResponse.ok) {
+          const timeslotsData = await timeslotsResponse.json();
+          setTimeslots(timeslotsData.items || []);
+        }
+      } catch (timeslotError) {
+        console.error('Error fetching timeslots:', timeslotError);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -161,11 +182,11 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
     const newEvent: EventToSchedule = {
       title: '',
       moduleId: '',
-      // student_count: 0, // Let student selection handle this
+      // student_count: 0, 
       durationMinutes: 60,
-      isExisting: false, // Mark as new
+      isExisting: false, 
+      event_date: new Date().toISOString().split('T')[0],
     };
-    // Prepend the new event to the array using spread operator
     setEvents([newEvent, ...events]);
   };
 
@@ -191,6 +212,12 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
           [field]: value
         };
       }
+    } else if (field === 'event_date') {
+      updatedEvents[index] = {
+        ...updatedEvents[index],
+        [field]: value,
+        eventDate: value
+      };
     } else {
       updatedEvents[index] = {
         ...updatedEvents[index],
@@ -203,7 +230,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
   
   // Toggle selection of an existing event
   const handleExistingEventToggle = (eventId: string | number | undefined) => {
-    if (eventId === undefined) return; // Should not happen if ID exists
+    if (eventId === undefined) return; 
   
     setSelectedExistingEventIds(prevSet => {
       const newSet = new Set(prevSet);
@@ -286,30 +313,23 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
     try {
       // Filter out non-existing events for scheduling
       const newEventsToSchedule = events
-        .filter(event => !event.isExisting)
+        .filter(event => !event.isExisting && event.title && event.moduleId)
         .map((event) => {
            // Find the original index in the full 'events' array to get selected students
            const originalIndex = events.findIndex(e => e === event);
+
            return {
-             ...event,
+             title: event.title || 'New Event',
+             moduleId: event.moduleId,
              student_count: selectedStudents[originalIndex]?.length || event.student_count || 0,
+             durationMinutes: event.durationMinutes || 60,
              preferredRoomIds: event.roomId ? [event.roomId] : [],
              preferredStaffIds: event.staffId ? [event.staffId] : [],
              students: selectedStudents[originalIndex] || []
            };
         });
 
-      // Filter existing events that are selected
-      const selectedExistingEventsForContext = events.filter(event =>
-        event.isExisting && event.id !== undefined && selectedExistingEventIds.has(event.id)
-      ).map(e => ({ // Map to a simpler structure if needed by backend
-          id: e.id,
-          start: e.start,
-          end: e.end,
-          roomId: e.room_id || e.roomId, // Adjust based on actual property
-          staffId: e.staff_id || e.staffId // Adjust based on actual property
-      }));
-
+        console.log("Events to schedule:", newEventsToSchedule); 
 
       if (newEventsToSchedule.length === 0) {
          setError("No new events added to schedule.");
@@ -317,11 +337,20 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
          return;
       }
 
-      console.log("Sending to scheduler API:", {
-        events: newEventsToSchedule,
-        preferences,
-        existingEvents: selectedExistingEventsForContext // Send selected existing events
-      });
+      const selectedExistingEventsData = events
+        .filter(event => event.isExisting && event.id && selectedExistingEventIds.has(event.id))
+        .map(event => ({
+          id: event.id,
+          roomId: event.roomId || event.room_id,
+          staffId: event.staffId || event.staff_id,
+          moduleId: event.moduleId,
+          event_date: event.eventDate || event.event_date,
+          timeslot_id: event.timeslot_id,
+          timeslotStart: event.timeslotStart || event.startTime,
+          timeslotEnd: event.timeslotEnd || event.endTime,
+        }));
+      
+    console.log("Selected existing events:", selectedExistingEventsData);
 
       const response = await fetch('http://localhost:5000/api/scheduler/batch', {
         method: 'POST',
@@ -332,32 +361,90 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
             ...preferences,
             optimizationFocus: preferences.optimizationFocus
           },
-          // Send selected existing events for context
-          existingEvents: selectedExistingEventsForContext
+          existingEvents: selectedExistingEventsData,
         })
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Scheduling failed: ${response.status} ${errorText}`);
       }
-      
+            
       const data = await response.json();
-      console.log('Scheduling results:', data);
-      
-      setResults(data);
+      console.log('Parsed scheduling results:', data);
+      setResults(data); 
+      setStep('results'); 
 
-      const metrics = data.metrics || {
-        resourceUtilization: 0,
-        staffWorkloadBalance: 0,
-        studentExperience: 0,
-        hardViolations: 0,
-        softViolations: 0
-      };
+      if (data.metrics) {
+        setOptimizationMetrics({
+          resourceUtilization: data.metrics.resourceUtilization || 0,
+          staffWorkloadBalance: data.metrics.staffWorkloadBalance || 0,
+          studentExperience: data.metrics.studentExperience || 0,
+          hardViolations: data.metrics.hardViolations || 0,
+          softViolations: data.metrics.softViolations || 0
+        });
+      }
 
-      setOptimizationMetrics(metrics);
-      setStep('results');
-    } catch (error: any) { // Catch specific error type if known
+      if (data && data.success && Array.isArray(data.results)) {
+        console.log("Attempting to save successful events...");
+
+        const savePromises = data.results
+          .filter((scheduledEvent: any) => scheduledEvent.success && scheduledEvent.event)
+          .map(async (scheduledEvent: any) => {
+            try {
+              const eventPayload = {
+                id: scheduledEvent.event.id, // This preserves existing event IDs
+                title: scheduledEvent.event.title,
+                event_date: scheduledEvent.event.event_date,
+                timeslot_id: scheduledEvent.event.timeslot_id,
+                timeslotStart: scheduledEvent.event.timeslotStart,
+                timeslotEnd: scheduledEvent.event.timeslotEnd,
+                roomId: scheduledEvent.event.roomId, 
+                staffId: scheduledEvent.event.staffId, 
+                moduleId: scheduledEvent.eventData?.moduleId || scheduledEvent.event.moduleId, 
+                student_count: scheduledEvent.eventData?.student_count || scheduledEvent.event.student_count || 0,
+                students: scheduledEvent.eventData?.students || scheduledEvent.event.students || []
+              };
+              
+              console.log("Payload for saving event:", eventPayload);
+
+              // Determine if this is an update (existing event) or create (new event)
+              const isExistingEvent = selectedExistingEventsData.some(e => e.id === eventPayload.id);
+              const endpoint = isExistingEvent 
+                ? `http://localhost:5000/api/events/${eventPayload.id}`
+                : 'http://localhost:5000/api/events';
+              const method = isExistingEvent ? 'PUT' : 'POST';
+
+              const saveResponse = await fetch(endpoint, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(eventPayload)
+              });
+
+              if (!saveResponse.ok) {
+                const errorText = await saveResponse.text();
+                console.error(`Failed to save event "${eventPayload.title}": ${saveResponse.status} - ${errorText}`);
+                return { success: false, title: eventPayload.title, error: `Status ${saveResponse.status}: ${errorText}` };
+              } else {
+                console.log(`Successfully saved event "${eventPayload.title}"`);
+                return { success: true, title: eventPayload.title };
+              }
+            } catch (error: any) {
+              console.error(`Error during fetch to save event "${scheduledEvent.event?.title}":`, error);
+              return { success: false, title: scheduledEvent.event?.title, error: error.message };
+            }
+          });
+
+          const saveResults = await Promise.allSettled(savePromises);
+            console.log("Save operation results:", saveResults);
+
+          const successfulSaves = saveResults.filter(r => r.status === 'fulfilled' && r.value.success).length;
+          const failedSaves = saveResults.length - successfulSaves;
+          alert(`Scheduling complete. Attempted to save ${saveResults.length} events. Success: ${successfulSaves}, Failed: ${failedSaves}. Check console for details.`);
+        } else {
+          console.log("No successful events found in results to save, or results format unexpected.");
+       }
+    } catch (error: any) { 
       console.error('Auto-scheduling error:', error);
       setError(error.message || 'An unexpected error occurred during scheduling.'); // Set error state
     } finally {
@@ -367,23 +454,47 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short',
-      month: 'short', 
-      day: 'numeric'
-    });
+    if (!dateString) return "Not set";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Not set";
+      
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error parsing date:', dateString, error);
+      return "Not set";
+    }
   };
 
-  // Format time for display
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+  const formatTime = (timeString: string) => {
+    if (!timeString) return "N/A";
+    
+    try {
+      // If it's already a time string (HH:MM or HH:MM:SS)
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timeString)) {
+        return timeString.split(':').slice(0, 2).join(':');
+      }
+      
+      const date = new Date(timeString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+      
+      // If all else fails
+      return "N/A";
+    } catch (error) {
+      console.error('Error parsing time:', timeString, error);
+      return "N/A";
+    }
   };
-  
+
   // Render optimization metrics
   const renderMetrics = () => {
     if (!optimizationMetrics) return null;
@@ -431,10 +542,9 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      {/* 1. Add flex flex-col */}
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
-        {/* Header (Title and Close Button) - Keep padding here */}
-        <div className="flex justify-between items-center p-6 border-b"> {/* Added border-b, adjusted padding */}
+        {/* Header (Title and Close Button) */}
+        <div className="flex justify-between items-center p-6 border-b"> 
           <h2 className="text-xl font-bold">Auto-Schedule Events</h2>
           <button
             onClick={onClose}
@@ -444,8 +554,8 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
           </button>
         </div>
 
-        {/* 2. Wrap scrollable content */}
-        <div className="flex-1 overflow-y-auto p-6"> {/* Add padding here for content */}
+        {/* Wrap scrollable content */}
+        <div className="flex-1 overflow-y-auto p-6"> 
           {error && (
             <div className='bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4'>
               {error}
@@ -497,7 +607,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                   <div className="mb-6 border p-4 rounded bg-gray-50">
                     <h3 className="text-sm font-medium text-gray-700 mb-2">Existing Events</h3>
                     <p className="text-xs text-gray-500 mb-3">
-                      New events will be scheduled around these existing events.
+                      Select events to reschedule or to keep as fixed when scheduling new events.
                     </p>
                   <div className="max-h-[150px] overflow-y-auto">
                   <table className="w-full text-xs">
@@ -509,19 +619,27 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                       </tr>
                     </thead>
                   <tbody>
-                  {existingEvents.slice(0, 5).map((event, idx) => (
+                  {events.filter(e => e.isExisting).slice(0, 5).map((event, idx) => (
                     <tr key={event.id} className="border-t">
                       <td className="p-2">{event.title}</td>
-                      <td className="p-2">{formatDate(event.eventDate || event.event_date)}</td>
+                      <td className="p-2">{formatDate(event.eventDate || event.event_date || '')}</td>
                       <td className="p-2">
-                        {event.timeslotStart || event.startTime || "N/A"} - {event.timeslotEnd || event.endTime || "N/A"}
+                        {formatTime(event.timeslotStart || event.startTime || '')} - {formatTime(event.timeslotEnd || event.endTime || '')}
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={event.id ? selectedExistingEventIds.has(event.id) : false}
+                          onChange={() => handleExistingEventToggle(event.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
                       </td>
                     </tr>
                   ))}
-                  {existingEvents.length > 5 && (
+                  {events.filter(e => e.isExisting).length > 5 && (
                     <tr>
-                      <td colSpan={3} className="p-2 text-center text-gray-500">
-                        And {existingEvents.length - 5} more events...
+                      <td colSpan={4} className="p-2 text-center text-gray-500">
+                        And {events.filter(e => e.isExisting).length - 5} more events...
                       </td>
                     </tr>
                   )}
@@ -562,8 +680,8 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
 
                     {event.isExisting ? (
                     // Read-only view for existing events with checkbox
-                      <div className={`relative p-4 rounded-lg border ${selectedExistingEventIds.has(event.id!) ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}> {/* Conditional styling */}
-                        <div className="absolute top-3 right-3"> {/* Checkbox top right */}
+                      <div className={`relative p-4 rounded-lg border ${selectedExistingEventIds.has(event.id!) ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}> 
+                        <div className="absolute top-3 right-3"> 
                           <input
                             type="checkbox"
                             checked={selectedExistingEventIds.has(event.id!)}
@@ -571,18 +689,18 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </div>
-                        <div className="space-y-1 pr-8"> {/* Add padding-right to avoid overlap */}
+                        <div className="space-y-1 pr-8"> 
                           <div className="flex justify-between items-center mb-2">
                             <h3 className="font-medium text-gray-800">{event.title}</h3>
                             {/* <span className="text-xs font-semibold bg-gray-200 text-gray-700 px-2 py-0.5 rounded">EXISTING</span> */}
                           </div>
                           <div className="text-sm text-gray-600">
-                            <span className="font-medium text-gray-700">Date:</span> {formatDate(event.eventDate || event.start || '')}
+                            <span className="font-medium text-gray-700">Date:</span> {formatDate(event.eventDate || event.event_date || '')}
                           </div>
                           <div className="text-sm text-gray-600">
                             <span className="font-medium text-gray-700">Time:</span>
-                            {formatTime(event.start || event.eventDate || '')} - {formatTime(event.end || '')}
-                          </div>
+                              {formatTime(event.timeslotStart || event.startTime || '')} - {formatTime(event.timeslotEnd || event.endTime || '')}
+                            </div>
                           <div className="text-sm text-gray-600">
                             <span className="font-medium text-gray-700">Room:</span> {event.roomName || event.room_id || 'N/A'}
                           </div>
@@ -851,9 +969,15 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
                     <h4 className="font-medium">{result.eventData.title}</h4>
                     {result.success ? (
                       <div>
+                        {console.log(`Event data for result ${index}:`, result.event)}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                          <p><span className="font-medium">Date:</span> {formatDate(result.event.start || result.event.startTime)}</p>
-                          <p><span className="font-medium">Time:</span> {formatTime(result.event.start || result.event.startTime)} - {formatTime(result.event.end || result.event.endTime)}</p>
+                          <p><span className="font-medium">Date:</span> {formatDate(result.event.eventDate || result.event.event_date || '')}</p>
+                          {(() => {
+                            const timeslot = timeslots.find(ts => ts.id === result.event.timeslot_id);
+                            return (
+                              <p><span className="font-medium">Time:</span> {formatTime(timeslot?.start_time || '')} - {formatTime(timeslot?.end_time || '')}</p>
+                            );
+                          })()}
                           <p><span className="font-medium">Room:</span> {result.event.roomName || rooms.find(r => r.id === result.event.roomId)?.name || result.event.roomId}</p>
                           <p><span className="font-medium">Staff:</span> {result.event.staffName || staff.find(s => s.id === result.event.staffId)?.name || result.event.staffId}</p>
                         </div>
@@ -877,11 +1001,11 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
               </div>
             </div>
           )}
-        </div> {/* End of scrollable wrapper */}
+        </div> 
 
 
-        {/* 3. Navigation Buttons - Make sticky */}
-        <div className="sticky bottom-0 bg-white flex justify-between px-6 pb-6 pt-4 border-t"> {/* Adjusted classes */}
+        {/* Navigation Buttons - Make sticky */}
+        <div className="sticky bottom-0 bg-white flex justify-between px-6 pb-6 pt-4 border-t">
           {step !== 'configure' ? (
             <button
               onClick={prevStep}
@@ -890,7 +1014,7 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
               Back
             </button>
           ) : (
-            <div></div> // Placeholder for flex alignment
+            <div></div>
           )}
 
           <div className="flex space-x-3">
@@ -917,9 +1041,9 @@ const AutoScheduleModal = ({ isOpen, onClose }: AutoScheduleModalProps) => {
               </button>
             )}
           </div>
-        </div> {/* End of sticky button container */}
+        </div> 
 
-      </div> {/* End of main modal container */}
+      </div> 
 
       {/* Student Selection Modal (remains the same) */}
       {isStudentModalOpen && activeEventIndex !== null && (

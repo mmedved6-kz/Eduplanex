@@ -118,8 +118,9 @@ const CourseForm = ({
                 setError(errorData.message || "An error occurred while saving the course.");
             }
 
-            if (onClose) onClose();
             router.refresh();
+            if (onClose) onClose();
+            
         } catch (error: any) {
             setError(error.message || "An error occurred while saving the course.");
         } finally {

@@ -48,13 +48,13 @@ const Module = {
 
     // Create a new module
     create: async (module) => {
-        const { name, description, courseId, semester } = module;
+        const { id, name, description, courseId, semester } = module;
         return await db.one(
-            `INSERT INTO Module 
-             (name, description, courseId, semester) 
-             VALUES ($1, $2, $3, $4) 
+            `INSERT INTO Module
+             (id, name, description, courseId)
+             VALUES ($1, $2, $3, $4)
              RETURNING *`,
-            [name, description, courseId, semester]
+            [id, name, description, courseId, semester]
         );
     },
 
@@ -62,12 +62,11 @@ const Module = {
     update: async (id, updates) => {
         const { name, description, courseId, semester } = updates;
         return await db.one(
-            `UPDATE Module SET 
-             name = $1, 
-             description = $2, 
-             courseId = $3, 
-             semester = $4 
-             WHERE id = $5 
+            `UPDATE Module SET
+             name = $1,
+             description = $2,
+             courseId = $3
+             WHERE id = $4
              RETURNING *`,
             [name, description, courseId, semester, id]
         );

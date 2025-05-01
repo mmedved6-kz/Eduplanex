@@ -130,9 +130,6 @@ const Event = {
         start_time, end_time, moduleId, roomId, staffId, 
         student_count, tag, courseId, students 
       } = updates;
-      
-      const startDate = new Date(start_time);
-      const endDate = new Date(end_time);
 
       return await db.tx(async t => {
         // Update the event
@@ -195,11 +192,11 @@ const Event = {
             e.title,
             e.event_date,
             e.tag,
-            e.roomid,      -- Select original roomid
-            e.staffid,     -- Select original staffid
-            e.moduleid,    -- Select original moduleid
-            e.courseid,    -- Select original courseid
-            e.timeslot_id, -- <<< ADD THIS LINE >>>
+            e.roomid,     
+            e.staffid,     
+            e.moduleid,    
+            e.courseid,    
+            e.timeslot_id, 
             ts.start_time as timeslot_start,
             ts.end_time as timeslot_end,
             m.name AS modulename,

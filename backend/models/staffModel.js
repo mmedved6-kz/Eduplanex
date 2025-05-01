@@ -50,6 +50,10 @@ const Staff = {
         `, [id]);
     },
 
+    getByUserId: async (userId) => {
+        return await db.oneOrNone('SELECT * FROM Staff WHERE user_id = $1', [userId]);
+    },
+
     // Create a new staff member
     create: async (staff) => {
         const { id, username, name, surname, email, phone, img, sex, departmentId, position } = staff;

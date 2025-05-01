@@ -188,12 +188,153 @@ const Constraint = {
       message
     };
   },
+
+  checkBuildingProximity: async (staffId, date, timeslotId, roomId, eventId = null) => {
+    const params = [staffId, date, timeslotId];
+    let query = `
+      SELECT event.*, room.buildingId as roomBuildingId
+      FROM Event event
+      JOIN timeslot ON event.timeslot_id = timeslot.id
+      JOIN room ON event.roomId = room.id
+      WHERE event.staffId = $1 
+      AND event.event_date = $2
+      AND timeslot.end_time < (SELECT start_time FROM timeslot WHERE id = $3)
+    `;
+  
+  if (eventId) {
+    query += ' AND event.id != $4';
+    params.push(eventId);
+  }
+  
+  query += ' ORDER BY timeslot.end_time DESC LIMIT 1';
+  const previousEvent = await db.oneOrNone(query, params);
+  
+  if (!previousEvent) {
+    return { hasWarning: false };
+  }
+  
+  const currentRoom = await db.oneOrNone('SELECT * FROM room WHERE id = $1', [roomId]);
+  const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
+  const previousTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [previousEvent.timeslot_id]);
+  
+  if (previousEvent.roomBuildingId !== currentRoom.buildingId) {
+    // Calculate time gap in minutes
+    const previousEndTime = new Date(`2000-01-01T${previousTimeslot.end_time}`);
+    const currentStartTime = new Date(`2000-01-01T${currentTimeslot.start_time}`);
+    const timeGapMinutes = (currentStartTime - previousEndTime) / (1000 * 60);
+    
+    const MINIMUM_TRAVEL_TIME = 15; // minutes
+    
+    if (timeGapMinutes < MINIMUM_TRAVEL_TIME) {
+      return {
+        hasWarning: true,
+        message: `Insufficient travel time (${timeGapMinutes} min) between buildings. At least ${MINIMUM_TRAVEL_TIME} min recommended.`
+      };
+    }
+  }
+  
+  return { hasWarning: false };
+},
+
+checkLunchBreak: async (staffId, date, timeslotId, eventId = null) => {
+  // Get the timeslot for the current event
+  const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
+  if (!currentTimeslot) return { hasWarning: false };
+  
+  // Define lunch period (usually 12:00 to 13:00)
+  const lunchStartTime = new Date(`2000-01-01T12:00:00`);
+  const lunchEndTime = new Date(`2000-01-01T13:00:00`);
+  
+  // Convert current event times to Date objects for comparison
+  const eventStartTime = new Date(`2000-01-01T${currentTimeslot.start_time}`);
+  const eventEndTime = new Date(`2000-01-01T${currentTimeslot.end_time}`);
+  
+  // Check if event overlaps lunch period
+  const overlapsLunch = (
+    (eventStartTime < lunchEndTime && eventEndTime > lunchStartTime)
+  );
+  
+  if (overlapsLunch) {
+    const params = [staffId, date];
+    let countQuery = `
+    SELECT COUNT(*) as count
+    FROM Event
+    WHERE staffId = $1
+    AND event_date = $2
+    `;
+
+    if (eventId != null && eventId !== '') { // Check for null, undefined, and empty string
+      countQuery += ` AND id != $3`;
+      params.push(eventId);
+    }
+
+    const otherEventsResult = await db.one(countQuery, params);
+    const otherEventsCount = parseInt(otherEventsResult.count, 10);
+    
+    // If staff has multiple events, lunch period should be protected
+    if (otherEventsCount > 0) {
+      return {
+          hasWarning: true,
+          message: 'Event scheduled during lunch hour (12:00-13:00) when staff has other classes.'
+      };
+  }
+  }
+  
+  return { hasWarning: false };
+  },
+
+  checkConsecutiveTeaching: async (staffId, date, timeslotId, eventId = null) => {
+    // Get all events for this staff on the selected date
+    const params = [staffId, date];
+    let query = `
+      SELECT event.*, timeslot.start_time, timeslot.end_time 
+      FROM Event event
+      JOIN timeslot timeslot ON event.timeslot_id = timeslot.id
+      WHERE event.staffId = $1 
+      AND event.event_date = $2
+    `;
+    
+    if (eventId) {
+      query += ' AND event.id != $3';
+      params.push(eventId);
+    }
+    
+    const events = await db.any(query, params);
+    
+    // Get the timeslot for the current event
+    const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
+    
+    // Maximum consecutive teaching hours
+    const MAX_CONSECUTIVE_HOURS = 3;
+    
+    // Check for consecutive teaching violations
+    let consecutiveHours = currentTimeslot.duration_minutes / 60;
+    let hasViolation = false;
+    let message = null;
+    
+    for (const existingEvent of events) {
+      // If events are adjacent or overlapping, add their duration
+      if (areTimeslotsAdjacent(currentTimeslot, existingEvent)) {
+        consecutiveHours += existingEvent.duration_minutes / 60;
+      }
+    }
+    
+    if (consecutiveHours > MAX_CONSECUTIVE_HOURS) {
+      hasViolation = true;
+      message = `Staff would exceed maximum consecutive teaching hours (${MAX_CONSECUTIVE_HOURS})`;
+    }
+    
+    return {
+      hasViolation,
+      message
+    };
+  },
   
   /**
    * Performs all constraint checks for an event
    */
   validateEvent: async (event) => {
-    const { id, roomId, staffId, student_count, event_date, timeslot_id } = event;
+    const { id, roomId, staffId, courseId, student_count, event_date, timeslot_id } = event;
     
     const timeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslot_id]);
     if (!timeslot) {
@@ -242,6 +383,7 @@ const Constraint = {
       });
     }
     
+    /** 
     // Room capacity check
     const capacityCheck = await Constraint.checkRoomCapacity(roomId, student_count);
     
@@ -252,10 +394,45 @@ const Constraint = {
         message: capacityCheck.message
       });
     }
+      */
     
     // Check for soft warnings
     const softWarnings = [];
     
+    if (!courseId) {
+      softWarnings.push({
+        constraintId: 'missing-course',
+        type: 'SOFT',
+        message: 'Course is required'
+      });
+    }
+    
+    if (!staffId) {
+      softWarnings.push({
+        constraintId: 'missing-staff',
+        type: 'SOFT',
+        message: 'Staff member is required'
+      });
+    }
+
+    if (roomId && student_count > 0) {
+      const capacityCheck = await Constraint.checkRoomCapacity(roomId, student_count);
+
+      if (!capacityCheck.capacityOk) {
+        hardViolations.push({
+          constraintId: 'room-capacity',
+          type: 'HARD',
+          message: capacityCheck.message
+        })
+      }
+    } else if (!roomId) {
+      softWarnings.push({
+        constraintId: 'missing-room',
+        type: 'SOFT',
+        message: 'Room is required'
+      });
+    }
+
     // Staff preferred hours check
     const preferredHoursCheck = await Constraint.checkStaffPreferredHours(timeslot.start_time);
     if (!preferredHoursCheck.isPreferred) {
@@ -409,149 +586,32 @@ const getViolations = async () => {
   }
 };
 
-checkConsecutiveTeaching: async (staffId, date, timeslotId, eventId = null) => {
-  // Get all events for this staff on the selected date
-  const params = [staffId, date];
-  let query = `
-    SELECT event.*, timeslot.start_time, timeslot.end_time 
-    FROM Event event
-    JOIN timeslot timeslot ON event.timeslot_id = timeslot.id
-    WHERE event.staffId = $1 
-    AND event.event_date = $2
-  `;
-  
-  if (eventId) {
-    query += ' AND event.id != $3';
-    params.push(eventId);
+const recordViolations = async (eventId, hardViolations, softWarnings) => {
+  try {
+      // Record hard violations
+      for (const violation of hardViolations) {
+          await db.none(`
+              INSERT INTO event_violations
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+          `, [eventId, violation.constraintId, violation.message]);
+      }
+      
+      // Record soft warnings
+      for (const warning of softWarnings) {
+          await db.none(`
+              INSERT INTO event_warnings
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+          `, [eventId, warning.constraintId, warning.message]);
+      }
+  } catch (error) {
+      console.error('Error recording violations:', error);
   }
-  
-  const events = await db.any(query, params);
-  
-  // Get the timeslot for the current event
-  const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
-  
-  // Maximum consecutive teaching hours
-  const MAX_CONSECUTIVE_HOURS = 3;
-  
-  // Check for consecutive teaching violations
-  let consecutiveHours = currentTimeslot.duration_minutes / 60;
-  let hasViolation = false;
-  let message = null;
-  
-  for (const existingEvent of events) {
-    // If events are adjacent or overlapping, add their duration
-    if (areTimeslotsAdjacent(currentTimeslot, existingEvent)) {
-      consecutiveHours += existingEvent.duration_minutes / 60;
-    }
-  }
-  
-  if (consecutiveHours > MAX_CONSECUTIVE_HOURS) {
-    hasViolation = true;
-    message = `Staff would exceed maximum consecutive teaching hours (${MAX_CONSECUTIVE_HOURS})`;
-  }
-  
-  return {
-    hasViolation,
-    message
-  };
-}
-
-checkBuildingProximity: async (staffId, date, timeslotId, roomId, eventId = null) => {
-  // Get previous event for this staff on the same day
-  const params = [staffId, date, timeslotId];
-  let query = `
-    SELECT event.*, room.buildingId as roomBuildingId
-    FROM Event event
-    JOIN timeslot ON event.timeslot_id = timeslot.id
-    JOIN room ON event.roomId = room.id
-    WHERE event.staffId = $1 
-    AND event.event_date = $2
-    AND timeslot.end_time < (SELECT start_time FROM timeslot WHERE id = $3)
-    ORDER BY timeslot.end_time DESC
-    LIMIT 1
-  `;
-  
-  if (eventId) {
-    query += ' AND event.id != $4';
-    params.push(eventId);
-  }
-  
-  const previousEvent = await db.oneOrNone(query, params);
-  
-  if (!previousEvent) {
-    return { hasWarning: false }; // No previous event, no proximity issue
-  }
-  
-  // Get the room for the current event
-  const currentRoom = await db.oneOrNone('SELECT * FROM room WHERE id = $1', [roomId]);
-  
-  // Get the timeslot for the current event
-  const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
-  
-  // Get the timeslot for the previous event
-  const previousTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [previousEvent.timeslot_id]);
-  
-  // If buildings are different, check if there's enough time to travel
-  if (previousEvent.roomBuildingId !== currentRoom.buildingId) {
-    // Calculate time gap in minutes
-    const previousEndTime = new Date(`2000-01-01T${previousTimeslot.end_time}`);
-    const currentStartTime = new Date(`2000-01-01T${currentTimeslot.start_time}`);
-    const timeGapMinutes = (currentStartTime - previousEndTime) / (1000 * 60);
-    
-    const MINIMUM_TRAVEL_TIME = 15; // minutes
-    
-    if (timeGapMinutes < MINIMUM_TRAVEL_TIME) {
-      return {
-        hasWarning: true,
-        message: `Insufficient travel time (${timeGapMinutes} min) between buildings. At least ${MINIMUM_TRAVEL_TIME} min recommended.`
-      };
-    }
-  }
-  
-  return { hasWarning: false };
-}
-
-checkLunchBreak: async (staffId, date, timeslotId, eventId = null) => {
-  // Get the timeslot for the current event
-  const currentTimeslot = await db.oneOrNone('SELECT * FROM timeslot WHERE id = $1', [timeslotId]);
-  
-  // Define lunch period (usually 12:00 to 13:00)
-  const lunchStartTime = new Date(`2000-01-01T12:00:00`);
-  const lunchEndTime = new Date(`2000-01-01T13:00:00`);
-  
-  // Convert current event times to Date objects for comparison
-  const eventStartTime = new Date(`2000-01-01T${currentTimeslot.start_time}`);
-  const eventEndTime = new Date(`2000-01-01T${currentTimeslot.end_time}`);
-  
-  // Check if event overlaps lunch period
-  const overlapsLunch = (
-    (eventStartTime <= lunchEndTime && eventEndTime >= lunchStartTime)
-  );
-  
-  if (overlapsLunch) {
-    // Check if staff has any other events during the day 
-    // to determine if this is their only opportunity for lunch
-    const otherEvents = await db.any(`
-      SELECT COUNT(*) as count
-      FROM Event
-      WHERE staffId = $1 
-      AND event_date = $2
-      AND id != $3
-    `, [staffId, date, eventId || '']);
-    
-    // If staff has multiple events, lunch period should be protected
-    if (otherEvents.count > 0) {
-      return {
-        hasWarning: true,
-        message: 'Event scheduled during lunch hour (12:00-13:00)'
-      };
-    }
-  }
-  
-  return { hasWarning: false };
-}
+};
 
 module.exports = {
   Constraint,
-  getViolations
+  getViolations,
+  recordViolations
 }

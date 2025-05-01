@@ -20,7 +20,7 @@ export default function Home() {
 
 
             if (user.role === 'admin') {
-                router.push('/dashboard/staff');
+                router.push('/dashboard/admin');
             } else if (user.role === 'staff') {
                 router.push('/dashboard/staff');
             } else if (user.role === 'student') {

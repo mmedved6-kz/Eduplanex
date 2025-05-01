@@ -15,12 +15,12 @@ const schema = z.object({
     .min(3, { message: "Title must be at least 3 characters long!" })
     .max(50, { message: "Title must be at most 50 characters long!" }),
   description: z.string().optional(),
-  event_date: z.string().min(1, { message: "Date is required!" }),
-  timeslot_id: z.string().min(1, { message: "Time slot is required!" }),
-  course_id: z.string().min(1, { message: "Course is required!" }),
+  event_date: z.string().optional(),
+  timeslot_id: z.string().optional(),
+  course_id: z.string().optional(),
   module_id: z.string().optional(),
-  room_id: z.string().min(1, { message: "Room is required!" }),
-  staff_id: z.string().min(1, { message: "Staff member is required!" }),
+  room_id: z.string().optional(),
+  staff_id: z.string().optional(),
   students: z.array(z.string()).optional(),
   student_count: z.union([
     z.string().transform(val => parseInt(val, 10)),
@@ -63,7 +63,7 @@ const EventForm = ({
   const router = useRouter();
   const [showViolationPanel, setShowViolationPanel] = useState(false);
   const [hardViolations, setHardViolations] = useState<any[]>();
-  const [softViolations, setSoftViolations] = useState<any[]>();
+  const [softWarnings, setSoftWarnings] = useState<any[]>();
   const [pendingEvent, setPendingEvent] = useState<any>(null);
   
   // Data states
@@ -212,13 +212,11 @@ const EventForm = ({
       setValue("title", data.title || "");
       setValue("description", data.description || "");
       
-      // Set date and timeslot
-      if (data.event_date) {
-        setValue("event_date", data.event_date);
-      }
-      if (data.timeslot_id) {
-        setValue("timeslot_id", data.timeslot_id);
-      }
+      const eventDate = data.event_date || data.eventDate || "";
+      const timeslotId = data.timeslot_id || data.timeslotId || "";
+
+      setValue("event_date", eventDate);
+      setValue("timeslot_id", timeslotId);
       
       // Set resources
       if (data.courseId || data.course_id) setValue("course_id", data.courseId || data.course_id);
@@ -319,10 +317,10 @@ const EventForm = ({
         description: formData.description || "",
         event_date: formData.event_date,
         timeslot_id: formData.timeslot_id,
-        courseId: formData.course_id,
+        courseId: formData.course_id || null,
         moduleId: formData.module_id || null,
-        roomId: formData.room_id,
-        staffId: formData.staff_id,
+        roomId: formData.room_id || null,
+        staffId: formData.staff_id || null,
         student_count: selectedStudents.length,
         tag: formData.event_type,
         recurring: false,
@@ -348,7 +346,7 @@ const EventForm = ({
 
       setPendingEvent(processedData);
       setHardViolations(constraintsResults.hardViolations || []);
-      setSoftViolations(constraintsResults.softWarnings || []);
+      setSoftWarnings(constraintsResults.softWarnings || []);
 
       if (constraintsResults.hardViolations.length > 0 || constraintsResults.softWarnings.length > 0) {
         setShowViolationPanel(true);
@@ -367,6 +365,15 @@ const EventForm = ({
 
   const saveEvent = async (processedData: any) => {
     try {
+
+      if (hardViolations && hardViolations.length > 0) {
+        processedData.hardViolations = hardViolations;
+      }
+      
+      if (softWarnings && softWarnings.length > 0) {
+        processedData.softWarnings = softWarnings;
+      }
+
       const url = type === "create" ? "http://localhost:5000/api/events" : `http://localhost:5000/api/events/${data?.id}`;
       const method = type === "create" ? "POST" : "PUT";
 
@@ -742,8 +749,8 @@ const EventForm = ({
         {/* Constraint Violation Panel */}
         {showViolationPanel && (
           <ConstraintViolationPanel
-          hardViolations={hardViolations}
-          softViolations={softViolations}
+          hardViolations={hardViolations || []}
+          softWarnings={softWarnings || []}
           event={pendingEvent}
           onSave={() => {
             if (pendingEvent) {

@@ -132,6 +132,17 @@ export const fetchEventData = async (
       sortOrder,
     });
 
+    const userJson = localStorage.getItem('user');
+    const user = userJson ? JSON.parse(userJson) : null;
+
+    if (user?.profileId) {
+      if (user.role === 'staff') {
+        params.append('staffId', user.profileId);
+      } else if (user.role === 'student') {
+        params.append('studentId', user.profileId);
+      }
+    }
+
     // Add filter params if they exist and are not null
     if (filters?.staffId !== null && filters?.staffId !== undefined) {
       params.append('staffId', filters.staffId.toString());

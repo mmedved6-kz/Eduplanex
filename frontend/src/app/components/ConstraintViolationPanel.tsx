@@ -155,11 +155,14 @@ const ConstraintViolationPanel = ({
           </button>
           <button 
             onClick={onSave}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            disabled={hardViolations.length > 0}
+            className={`px-4 py-2 text-white rounded hover:opacity-90 ${
+              hardViolations.length > 0 
+                ? 'bg-yellow-600' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            }`}
           >
             {hardViolations.length > 0
-              ? 'Cannot Save' 
+              ? 'Save with Violations' 
               : softWarnings.length > 0 
                 ? 'Save Anyway' 
                 : 'Save'}

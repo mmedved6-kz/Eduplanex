@@ -114,11 +114,7 @@ const RoomListPage = () => {
 
   const renderActionsCell = (item: Room) => (
     <div className="flex items-center gap-2">
-      <Link href={`/dashboard/list/room/${item.id}`}>
-        <button className="w-7 h-7 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
-          <Image src="/view.png" alt="View" width={14} height={14} />
-        </button>
-      </Link>
+      <FormModal table="room" type="update" id={item.id} />
       <FormModal table="room" type="delete" id={item.id}/>
     </div>
   );

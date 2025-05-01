@@ -40,16 +40,20 @@ const Student = {
             `, [id]);
     },
 
+    getByUserId: async (userId) => {
+      return await db.oneOrNone('SELECT * FROM Student WHERE user_id = $1', [userId]);
+    },
+
     // Create a new student
     create: async (student) => {
-        const { id, username, name, surname, email, phone, img, sex, enrollment_date} = student;
+        const { id, username, email, name, surname, phone, year, courseId, sex, img} = student;
         return await db.tx(async t => {
           const newStudent = await t.one(
-            `INSERT INTO Student 
-             (id, username, name, surname, email, phone, img, sex, enrollment_date) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+            `INSERT INTO Student
+             (id, username, email, name, surname, phone, year, course_id, sex, img, enrollment_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, DEFAULT)
              RETURNING *`,
-            [id, username, name, surname, email, phone, img, sex, enrollment_date]
+            [id, username, email, name, surname, phone, year, courseId, sex, img]
         );
             return newStudent;
         });
@@ -68,7 +72,6 @@ const Student = {
               phone = $5
               img = $6,
               sex = $7,
-              enrollment_date = $8
               WHERE id = $9 
               RETURNING *`,
             [username, name, surname, email, phone, img, sex, enrollment_date, id]

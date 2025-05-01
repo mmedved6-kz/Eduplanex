@@ -858,7 +858,7 @@ static async runGeneticAlgorithm(problem) {
   const crossoverRate = 0.8;
   const eliteCount = 5; // Number of best chromosomes to preserve unchanged
   
-  console.log(`Running enhanced genetic algorithm with population ${populationSize}, generations ${generations}`);
+  console.log(`Running genetic algorithm with population ${populationSize}, generations ${generations}`);
   
   // Initialize population
   let population = await this.initializePopulation(populationSize, problem);

@@ -13,6 +13,7 @@ const roomRoutes = require('./routes/roomRoutes');
 const actionRoutes = require('./routes/actionRoutes');
 const uploadRoutes = require('./routes/imageUploadRoute');
 const timeslotRoutes = require('./routes/timeslotRoutes');
+const authRoutes = require('./routes/authRoutes');
 const cors = require('cors');
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/modules', moduleRoutes);

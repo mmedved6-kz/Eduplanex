@@ -9,7 +9,7 @@ const db = pgp({
     password: process.env.DB_PASSWORD,
 });
 
-db.connect()
+db.connect({direct: true})
     .then(obj => {
         console.log('✅ Database connected successfully.');
         obj.done(); // success, release the connection

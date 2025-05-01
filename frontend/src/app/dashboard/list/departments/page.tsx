@@ -102,11 +102,6 @@ const DepartmentListPage = () => {
 
   const renderActionsCell = (item: Department) => (
     <div className="flex items-center gap-2">
-      <Link href={`/dashboard/list/department/${item.id}`}>
-        <button className="w-7 h-7 flex items-center justify-center rounded-full bg-[#4aa8ff] hover:bg-[#5abfff]">
-          <Image src="/view.png" alt="View" width={14} height={14} />
-        </button>
-      </Link>
       <FormModal table="department" type="delete" id={item.id}/>
     </div>
   );
@@ -150,7 +145,7 @@ const DepartmentListPage = () => {
                 entityType="department"
               />
             </div>
-            <FormModal table="department" type="create" />
+
           </div>
         </div>
       </div>

@@ -14,67 +14,28 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-
-    try {
-        // For now, hardcoded values for quick development
-        // Replace this with actual API calls later
-        if (email === "admin@edu.com" && password === "password123") {
-          // Store user info
-          localStorage.setItem("user", JSON.stringify({
-            id: 1,
-            email: "admin@edu.com",
-            role: "admin"
-          }));
-          router.push("/dashboard/staff");
-        } else if (email === "staff@edu.com" && password === "password123") {
-          localStorage.setItem("user", JSON.stringify({
-            id: 2,
-            email: "staff@edu.com",
-            role: "staff"
-          }));
-          router.push("/dashboard/staff");
-        } else if (email === "student@edu.com" && password === "password123") {
-          localStorage.setItem("user", JSON.stringify({
-            id: 3,
-            email: "student@edu.com",
-            role: "student"
-          }));
-          router.push("/dashboard/student");
-        } else {
-          setError("Invalid email or password");
-        }
-      } catch (error) {
-        setError("An error occurred during login");
-      } finally {
-        setLoading(false);
-      }
-    };
   
-
-
-    /** 
     try {
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-
+  
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Login failed");
       }
-
+  
       const data = await response.json();
       
-      // Store token and user info
+      // Store the complete user object including profileId
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       
       // Navigate based on role
       if (data.user.role === "admin") {
-        router.push("/dashboard/staff");
+        router.push("/dashboard/admin");
       } else if (data.user.role === "staff") {
         router.push("/dashboard/staff");
       } else {
@@ -86,7 +47,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-  */
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

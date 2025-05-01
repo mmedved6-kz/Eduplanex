@@ -30,7 +30,6 @@ const EventCalendar = () => {
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        setSelectedDate(new Date()); 
         setIsMounted(true);
 
         const fetchEvents = async () => {
@@ -77,7 +76,8 @@ const EventCalendar = () => {
               setEvents(formattedEvents);
                 
               // Filter events for selected date (or today if none selected)
-              const currentDate = selectedDate || new Date();
+              const currentDate = new Date();
+              setSelectedDate(currentDate);
               const filteredEvents = formattedEvents.filter((event: Event) => 
                 formatDate(event.date) === formatDate(currentDate)
               );
@@ -159,8 +159,8 @@ const EventCalendar = () => {
                                 )}
                             </>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-1 filter invert" />
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300 h-full">
+                                <Image src="/calendar-empty.png" alt="No Events" width={48} height={48} className="opacity-50 mb-2 filter invert" />
                                 <p className="text-sm text-gray-400">No events for this date.</p>
                             </div>
                         )}

@@ -16,6 +16,8 @@ class EventDto {
         this.staffId = event.staffid;
         this.moduleId = event.moduleid;
         this.courseId = event.courseid;
+        this.studentCount = event.student_count || 0;
+        this.students = event.students || [];
     }
 
     formatTimeOnly(datetimeStr) {

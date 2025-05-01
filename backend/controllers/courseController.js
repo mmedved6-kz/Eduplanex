@@ -59,9 +59,14 @@ const createCourse = async (req, res) => {
             id: req.body.id,
             name: req.body.name,
             description: req.body.description,
-            credits: req.body.credits,
+            credit_hours: req.body.credits,
             departmentId: req.body.departmentId,
         }
+
+        if (courseData.credit_hours === undefined || courseData.departmentId === undefined /* add other checks */) {
+            return res.status(400).json({ message: 'Missing required course data fields' });
+        }
+
         const newCourse = await Course.create(courseData);
         const courseDTO = new CourseDTO(newCourse);
         res.status(201).json(courseDTO);
@@ -77,10 +82,15 @@ const updateCourse = async (req, res) => {
             id: req.body.id,
             name: req.body.name,
             description: req.body.description,
-            credits: req.body.credits,
+            credit_hours: req.body.credits,
             departmentId: req.body.departmentId,
         }
+
         const updatedCourse = await Course.update(req.params.id, courseData);
+        if (!updatedCourse) { // Check if update returned null/undefined (e.g., course not found)
+             return res.status(404).json({ message: 'Course not found' });
+        }
+
         const courseDTO = new CourseDTO(updatedCourse);
         res.json(courseDTO);
     } catch (error) {

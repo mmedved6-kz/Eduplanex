@@ -16,8 +16,20 @@ const menuItems = [
       {
         icon: "/home.png",
         label: "Home",
+        href: "/dashboard/admin",
+        visible: ["admin"],
+      },
+      {
+        icon: "/home.png",
+        label: "Home",
         href: "/dashboard/staff",
-        visible: ["admin", "staff", "student"],
+        visible: ["staff"],
+      },
+      {
+        icon: "/home.png",
+        label: "Home",
+        href: "/dashboard/student",
+        visible: ["student"],
       },
       {
         icon: "/staff.png",

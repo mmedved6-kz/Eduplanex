@@ -80,6 +80,28 @@ const createEvent = async (req, res) => {
 
         console.log('Creating event with students:', eventData.students);
         const newEvent = await Event.create(eventData);
+
+        if (req.body.hardViolations && Array.isArray(req.body.hardViolations)) {
+          for (const violation of req.body.hardViolations) {
+            await db.none(`
+              INSERT INTO event_violations 
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+            `, [newEvent.id, violation.constraintId, violation.message]);
+          }
+        }
+
+        if (req.body.softWarnings && Array.isArray(req.body.softWarnings)) {
+          // Save warnings to event_warnings table
+          for (const warning of req.body.softWarnings) {
+            await db.none(`
+              INSERT INTO event_warnings 
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+            `, [newEvent.id, warning.constraintId, warning.message]);
+          }
+        }
+
         const eventDto = new EventDto(newEvent);
         res.status(201).json(eventDto);
     } catch (error) {
@@ -107,13 +129,37 @@ const updateEvent = async (req, res) => {
             roomId: req.body.roomId || req.body.room_id,
             staffId: req.body.staffId || req.body.staff_id,
             courseId: req.body.courseId || req.body.course_id,
-            student_count: req.body.student_count || req.body.student_count || 0,
+            student_count: req.body.student_count || req.body.studentCount || 0,
             tag: req.body.event_type || req.body.tag || 'CLASS',
             students: req.body.students || [] 
         };
 
         console.log('Update data with students:', eventData.students);
         const updatedEvent = await Event.update(req.params.id, eventData);
+
+        await db.none('DELETE FROM event_violations WHERE event_id = $1', [req.params.id]);
+        await db.none('DELETE FROM event_warnings WHERE event_id = $1', [req.params.id]);
+
+        if (req.body.hardViolations && Array.isArray(req.body.hardViolations)) {
+          for (const violation of req.body.hardViolations) {
+            await db.none(`
+              INSERT INTO event_violations 
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+            `, [req.params.id, violation.constraintId, violation.message]);
+          }
+        }
+
+        if (req.body.softWarnings && Array.isArray(req.body.softWarnings)) {
+          for (const warning of req.body.softWarnings) {
+            await db.none(`
+              INSERT INTO event_warnings 
+              (event_id, constraint_type, message, created_at)
+              VALUES ($1, $2, $3, NOW())
+            `, [req.params.id, warning.constraintId, warning.message]);
+          }
+        }
+
         const eventDto = new EventDto(updatedEvent);
         res.json(eventDto);
     } catch (error) {

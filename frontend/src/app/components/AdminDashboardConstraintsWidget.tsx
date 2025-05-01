@@ -34,14 +34,6 @@ const ConstraintViolationsWidget = () => {
 
         if (data && Array.isArray(data.violations)) {
           setViolations(data.violations);
-        } else {
-          const extractedViolations = data?.violations || data?.items || (Array.isArray(data) ? data : []);
-          setViolations(extractedViolations);
-          
-          if (extractedViolations.length === 0) {
-            console.warn("No violations found in response:", data);
-            setError("No constraint violations found in response");
-          }
         }
       } catch (error) {
         console.error('Error fetching constraint violations:', error);

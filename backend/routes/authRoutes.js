@@ -1,8 +1,13 @@
 const express = require('express');
-const db = require('../config/db');
 const router = express.Router();
-const bcrypt = require('bcryptjs'); 
+// const db = require('../config/db');
+// const bcrypt = require('bcryptjs');
 
+const authController = require('../controllers/authController');
+
+router.post('/login', authController.login);
+
+/** 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
     try {
@@ -17,15 +22,15 @@ router.post('/login', async (req, res) => {
 
         // Check if password matches (assuming passwords are stored hashed)
         // For development, you might skip this check initially
-        // const passwordMatches = await bcrypt.compare(password, user.password);
-        // if (!passwordMatches) {
-        //     return res.status(401).json({ error: 'Invalid credentials' });
-        // }
+        const passwordMatches = await bcrypt.compare(password, user.password);
+        if (!passwordMatches) {
+             return res.status(401).json({ error: 'Invalid credentials' });
+        }
         
         // For simplicity, let's use plain password comparison for now
-        if (password !== user.password) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        //if (password !== user.password) {
+        //    return res.status(401).json({ error: 'Invalid credentials' });
+        //}
 
         // Determine role based on your schema
         let role = "staff";  // Default role
@@ -47,5 +52,6 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+*/
 
 module.exports = router;

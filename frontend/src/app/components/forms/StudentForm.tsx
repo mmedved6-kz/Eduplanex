@@ -198,7 +198,8 @@ const StudentForm = ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save student");
+        console.error("Backend error:", errorData); 
+        setError(errorData.message || `Request failed with status ${response.status}`); 
       }
 
       if (onClose) onClose();

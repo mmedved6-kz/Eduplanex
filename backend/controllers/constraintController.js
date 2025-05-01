@@ -6,6 +6,14 @@ const checkConstraints = async (req, res) => {
     const eventToCheck = req.body;
     console.log("Checking constraints for event:", eventToCheck);
     
+    if ((!eventToCheck.event_date && !eventToCheck.eventDate) || 
+      (!eventToCheck.timeslot_id && !eventToCheck.timeslotId)) {
+        return res.status(400).json({
+          error: 'Event date and timeslot ID are required'
+        });
+    }
+
+    /** 
     // Validate required fields
     if (!eventToCheck.room_id && !eventToCheck.roomId) {
       return res.status(400).json({
@@ -25,13 +33,15 @@ const checkConstraints = async (req, res) => {
         error: 'Event date and timeslot ID are required'
       });
     }
+    */
     
     const event = {
       id: eventToCheck.id || null,
-      roomId: eventToCheck.roomId || eventToCheck.room_id,
-      staffId: eventToCheck.staffId || eventToCheck.staff_id,
-      moduleId: eventToCheck.moduleId || eventToCheck.module_id,
-      student_count: eventToCheck.student_count || eventToCheck.studentCount || 0,
+      roomId: eventToCheck.roomId || eventToCheck.room_id || null,
+      staffId: eventToCheck.staffId || eventToCheck.staff_id || null,
+      moduleId: eventToCheck.moduleId || eventToCheck.module_id || null,
+      courseId: eventToCheck.courseId || eventToCheck.course_id || null,
+      student_count: parseInt(eventToCheck.student_count || eventToCheck.studentCount || 0),
       event_date: eventToCheck.event_date || eventToCheck.eventDate,
       timeslot_id: eventToCheck.timeslot_id || eventToCheck.timeslotId
     };
@@ -133,6 +143,34 @@ const getConstraints = async (req, res) => {
         description: 'Staff should have minimal gaps between classes',
         type: 'SOFT',
         category: 'STAFF_PREFERENCE'
+      },
+      {
+        id: 'missing-staff',
+        name: 'Missing Staff',
+        description: 'Staff is not assigned to the class',
+        type: 'SOFT',
+        category: 'STAFF_PREFERENCE'
+      },
+      {
+        id: 'missing-room',
+        name: 'Missing Room',
+        description: 'Room is not assigned to the class',
+        type: 'SOFT',
+        category: 'ROOM_PREFERENCE'
+      },
+      {
+        id: 'missing-module',
+        name: 'Missing Module',
+        description: 'Module is not assigned to the class',
+        type: 'SOFT',
+        category: 'MODULE_PREFERENCE'
+      },
+      {
+        id: 'missing-course',
+        name: 'Missing Course',
+        description: 'Course is not assigned to the class',
+        type: 'SOFT',
+        category: 'COURSE_PREFERENCE'
       }
     ];
     

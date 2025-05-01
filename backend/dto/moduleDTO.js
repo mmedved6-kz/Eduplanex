@@ -5,7 +5,6 @@ class ModuleDTO {
         this.description = module.description;
         this.courseId = module.courseid;
         this.courseName = module.coursename
-        this.semester = module.semester;
     }
 }
 

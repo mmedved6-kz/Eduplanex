@@ -127,6 +127,18 @@ const BigCalendar = ({
 
     const fetchEvents = useCallback(async () => {
         try {
+            const userJson = localStorage.getItem('user');
+            const user = userJson ? JSON.parse(userJson) : null;
+
+            let url = 'http://localhost:5000/api/events/calendar';
+            if (user?.profileId) {
+              if (user.role === 'staff') {
+                url += `?staffId=${user.profileId}`;
+              } else if (user.role === 'student') {
+                url += `?studentId=${user.profileId}`;
+              }
+            }
+
             console.log('Starting to fetch events...');
             
             const response = await fetch('http://localhost:5000/api/events/calendar');
@@ -147,14 +159,14 @@ const BigCalendar = ({
                         let start, end;
                         
                         // Change to match the camelCase property names from backend
-                        if (event.startTime && event.endTime) {
+                        if (event.timeslotStart && event.timeslotEnd) {
                             const datePart = event.eventDate?.split('T')[0] || event.event_date;
-                            start = new Date(`${datePart}T${event.startTime}`);
-                            end = new Date(`${datePart}T${event.endTime}`);
-                            
-                            // Add debugging
-                            console.log(`Successfully parsed dates for ${event.title}:`, 
-                                {datePart, startTime: event.startTime, endTime: event.endTime, start, end});
+                            start = new Date(`${datePart}T${event.timeslotStart}`);
+                            end = new Date(`${datePart}T${event.timeslotEnd}`);
+                        } else if (event.startTime && event.endTime) {
+                                const datePart = event.eventDate?.split('T')[0] || event.event_date;
+                                start = new Date(`${datePart}T${event.startTime}`);
+                                end = new Date(`${datePart}T${event.endTime}`);
                         } else {
                             console.error('Event missing timeslot data:', event);
                             return null;
@@ -170,13 +182,12 @@ const BigCalendar = ({
                             title: event.title,
                             start,
                             end,
-                            room_id: event.room_id || event.roomId, // Also handle potential camelCase for room_id
-                            staff_id: event.staff_id || event.staffId, // Also handle potential camelCase for staff_id
-                            course_id: event.course_id || event.module_id || event.moduleId, // Handle variations
+                            room_id: event.room_id || event.roomId,
+                            staff_id: event.staff_id || event.staffId,
+                            course_id: event.course_id || event.module_id || event.moduleId,
                             student_count: event.student_count || 0,
                             tag: event.tag || 'CLASS',
-                            // Use the camelCase name from the backend DTO
-                            timeslot_id: event.timeslotId // <-- CHANGE THIS LINE
+                            timeslot_id: event.timeslotId || event.timeslot_id
                         };
                     } catch (error) {
                         console.error('Error processing event:', event, error);

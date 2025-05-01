@@ -19,12 +19,15 @@ type Event = {
   eventDate: string; 
   timeslotId: string;
   timeslotStart: string;
+  startTime: string;
+  endTime: string;
   timeslotEnd: string;
   duration: number;
   moduleName: string;
   roomName: string;
   staffName: string;
   student_count: number;
+  studentCount: number;
   tag: string;
 };
 
@@ -163,15 +166,39 @@ const EventListPage = () => {
     }
   };
 
+  const formatTimeForDisplay = (timeString: string) => {
+    if (!timeString) return "N/A";
+    
+    try {
+      if (timeString.includes(':')) {
+        const [hours, minutes] = timeString.split(':');
+        return `${hours}:${minutes}`;
+      }
+      
+      const date = new Date(timeString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true 
+        });
+      }
+      return timeString;
+
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return timeString;
+    }
+  }
+
   const renderEventCell = (item: Event) => (
     <div className="flex items-center gap-4 p-4">
       <div className="flex flex-col">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold">{item.title}</h3>
-          <EventTag tag={item.tag} />
         </div>
         <p className="text-xs text-gray-400">
-          {formatDateForDisplay(item.eventDate)} • {item.timeslotStart} - {item.timeslotEnd}
+          {formatDateForDisplay(item.eventDate)} • {formatTimeForDisplay(item.timeslotStart || item.startTime)} - {formatTimeForDisplay(item.timeslotEnd || item.endTime)}
         </p>
       </div>
     </div>
@@ -192,14 +219,14 @@ const EventListPage = () => {
       <td>{renderEventCell(item)}</td>
       <td className="hidden md:table-cell">{item.moduleName || "N/A"}</td>
       <td className="hidden md:table-cell">
-        {item.timeslotStart} - {item.timeslotEnd}
+        {formatTimeForDisplay(item.timeslotStart || item.startTime)} - {formatTimeForDisplay(item.timeslotEnd || item.endTime)}
       </td>
       <td className="hidden md:table-cell">
         <EventTag tag={item.tag} />
       </td>
       <td className="hidden lg:table-cell">{item.roomName || "N/A"}</td>
       <td className="hidden lg:table-cell">{item.staffName || "Unassigned"}</td>
-      <td className="hidden lg:table-cell">{item.student_count || 0}</td>
+      <td className="hidden lg:table-cell">{item.student_count || item.studentCount|| 0}</td>
       <td>{renderActionsCell(item)}</td>
     </tr>
   );

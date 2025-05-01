@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import InputField from "../InputField";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const schema = z.object({
   id: z.string().min(1, { message: "Staff ID is required!" }),
@@ -54,6 +55,7 @@ const StaffForm = ({
   const [activeTab, setActiveTab] = useState<TabType>("Staff Details");
   const [imageUrl, setImageUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(data?.img || null);
   const router = useRouter();
 
   const [departments, setDepartments] = useState([]);
@@ -121,42 +123,51 @@ const StaffForm = ({
       if (data.img) {
         setValue("img", data.img);
         setImageUrl(data.img);
+        setPreviewUrl(data.img);
       }
 
       if (data.departmentId) setValue("departmentId", data.departmentId);
     }
   }, [type, data, setValue]);
   
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true); 
+    setError(""); 
+
     const formData = new FormData();
-    formData.append("image", file);
-    
-    setIsUploading(true);
-    
+    formData.append('image', file); 
+
     try {
-      // Replace with your actual image upload endpoint
-      const response = await fetch("http://localhost:5000/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-      
-      const data = await response.json();
-      setImageUrl(data.imageUrl);
-      setValue("img", data.imageUrl);
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      setError("Failed to upload image. Please try again.");
+        const response = await fetch('http://localhost:5000/api/upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Image upload failed');
+        }
+
+        const result = await response.json();
+        const imageUrl = result.imageUrl; 
+
+        setValue('img', imageUrl, { shouldValidate: true }); 
+
+        setPreviewUrl(imageUrl);
+
+    } catch (uploadError: any) {
+        console.error("Image upload error:", uploadError);
+        setError(uploadError.message || "Failed to upload image.");
+        // Optional clear preview if upload fails
+        // setPreviewUrl(null);
+        // setValue('img', '', { shouldValidate: true });
     } finally {
-      setIsUploading(false);
+        setLoading(false); 
     }
-  };
+};
 
   const onSubmit = async (formData: Inputs) => {
     setLoading(true);
@@ -178,16 +189,16 @@ const StaffForm = ({
         surname: formData.surname,
         phone: formData.phone,
         position: formData.position,
-        departmentId: formData.departmentId, // Convert to number
+        departmentId: formData.departmentId, 
+        img: formData.img || null, 
         sex: formData.sex,
-        img: formData.img || null, // Include image URL
       };
 
       if (
         type === "update" &&
         (!formData.password || formData.password === "")
       ) {
-        delete processedData.password; // Use processedData instead of formData
+        delete processedData.password;
       }
 
       const response = await fetch(url, {
@@ -296,40 +307,30 @@ const StaffForm = ({
                 <label className="text-sm text-gray-600">Profile Image</label>
                 <div className="flex items-center gap-4">
                   <div className="h-20 w-20 rounded-full overflow-hidden bg-gray-100 border flex items-center justify-center">
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt="Profile"
-                        className="h-full w-full object-cover"
+                    {previewUrl ? (
+                      <Image
+                        src={previewUrl}
+                        alt="Profile Preview"
+                        width={80}
+                        height={80}
+                        className="object-cover w-full h-full"
                       />
                     ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-10 w-10 text-gray-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
+                      <span className="text-xs text-gray-500">Profile</span>
                     )}
                   </div>
                   <div className="flex-1">
                     <input
                       type="file"
-                      id="image-upload"
+                      id="imageUpload"
                       accept="image/*"
                       className="hidden"
                       onChange={handleImageUpload}
+                      disabled={loading}
                     />
                     <label
-                      htmlFor="image-upload"
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                      htmlFor="imageUpload"
+                      className="cursor-pointer px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
                     >
                       {isUploading ? "Uploading..." : "Upload Image"}
                     </label>
